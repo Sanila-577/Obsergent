@@ -1,0 +1,18 @@
+{
+  "resourceSpans": [{
+    "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "curl-demo"}}]},
+    "scopeSpans": [{
+      "spans": [
+        {"traceId": "0af7651916cd43dd8448eb211c80319c", "spanId": "b7ad6b7169203331", "name": "agent.run",
+         "kind": 1, "startTimeUnixNano": "1700000000000000000", "endTimeUnixNano": "1700000000050000000"},
+        {"traceId": "0af7651916cd43dd8448eb211c80319c", "spanId": "b7ad6b7169203332",
+         "parentSpanId": "b7ad6b7169203331", "name": "tools/call search", "kind": 3,
+         "startTimeUnixNano": "1700000000010000000", "endTimeUnixNano": "1700000000020000000",
+         "attributes": [
+           {"key": "mcp.method.name", "value": {"stringValue": "tools/call"}},
+           {"key": "gen_ai.tool.name", "value": {"stringValue": "search"}},
+           {"key": "mcp.tool.arguments", "value": {"stringValue": "{\"q\": \"python\"}"}}]}
+      ]
+    }]
+  }]
+}

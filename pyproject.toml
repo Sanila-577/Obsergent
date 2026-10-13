@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agenttrace"
+version = "0.1.0"
+description = "A free, local-first flight recorder and debugger for MCP agents"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "httpx>=0.27",                                   # HTTP proxy (phase 2)
+    "opentelemetry-sdk>=1.30",
+    "opentelemetry-exporter-otlp-proto-http>=1.30",
+    "opentelemetry-proto>=1.30",
+]
+
+[project.optional-dependencies]
+# Auto-trace LangChain / LangGraph inside the agent.
+langchain = ["openinference-instrumentation-langchain>=0.1.70"]
+# Everything the demo agent in examples/bookshop needs (mcp is pinned below 2.0:
+# langchain-mcp-adapters 0.3.x needs MCP SDK v1).
+examples = [
+    "mcp>=1.24,<2",
+    "langgraph>=1.2",
+    "langchain>=1.4",
+    "langchain-ollama>=1.1",
+    "langchain-mcp-adapters>=0.3,<0.4",
+    "openinference-instrumentation-langchain>=0.1.70",
+]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "httpx>=0.27", "ruff>=0.6"]
+
+[project.scripts]
+agenttrace = "agenttrace.cli:main"
+
+# Namespace packages (no __init__.py files): hatch bundles the whole folder tree.
+[tool.hatch.build.targets.wheel]
+packages = ["src/agenttrace"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 120
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# Explicit, so local runs and CI agree: pycodestyle, pyflakes, import order, bugbear, pyupgrade.
+select = ["E", "F", "I", "B", "UP"]
