@@ -1,0 +1,11 @@
+# Jaeger v2 all-in-one: UI on 16686, OTLP gRPC on 4317, OTLP HTTP on 4318
+#
+# Start:  docker compose up -d      Stop:  docker compose down
+# Jaeger keeps traces in memory, so they disappear when the container stops.
+services:
+  jaeger:
+    image: cr.jaegertracing.io/jaegertracing/jaeger:2.22.0   # one container: collector + storage + UI
+    ports:
+      - "16686:16686"   # the web UI: open http://localhost:16686
+      - "4317:4317"     # OTLP over gRPC (not used here)
+      - "4318:4318"     # OTLP over HTTP: our exporter sends spans here

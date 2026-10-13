@@ -1,5 +1,5 @@
 # Tested together on Python 3.13 (October 2026).
-# Active lines cover Examples 1-5. Uncomment the rest as you reach each example.
+# Active lines cover Examples 1-6. Uncomment the rest as you reach each example.
 
 # --- Example 1 ---
 opentelemetry-api==1.45.1
@@ -19,5 +19,5 @@ langfuse==4.17.0
 # --- Example 4 ---
 openinference-instrumentation-langchain==0.1.79
 
-# --- Examples 5-6 (5 needs nothing new; 6 needs the line below) ---
-# opentelemetry-exporter-otlp-proto-http==1.45.1
+# --- Example 5 needs nothing new; Example 6 needs the exporter below ---
+opentelemetry-exporter-otlp-proto-http==1.45.1
