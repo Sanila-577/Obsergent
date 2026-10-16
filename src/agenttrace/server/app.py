@@ -18,10 +18,11 @@ from agenttrace.analysis.safety import drift_report
 from agenttrace.analysis.smells import find_smells
 from agenttrace.ingest.otlp import parse_export_json, parse_export_request
 from agenttrace.ingest.pipeline import ingest_spans
+from agenttrace.storage.base import Backend
 from agenttrace.storage.sqlite import SQLiteStorage
 
 
-def create_app(storage: SQLiteStorage | None = None) -> FastAPI:
+def create_app(storage: Backend | None = None) -> FastAPI:
     # One object plays both roles (spans + metadata). Tests pass in a temporary database.
     store = storage or SQLiteStorage(config.DB_PATH)
     app = FastAPI(title="AgentTrace", version="0.1.0")
@@ -47,7 +48,7 @@ def create_app(storage: SQLiteStorage | None = None) -> FastAPI:
                 raise HTTPException(415, "Send OTLP as application/x-protobuf or application/json")
         except (DecodeError, ValueError) as err:  # bad bytes / bad JSON / bad hex ids
             raise HTTPException(400, f"Could not parse the OTLP request: {err}") from err
-        ingest_spans(spans, store, store)
+        ingest_spans(spans, store)
         # The reply uses the same format as the request (an empty "success" message).
         if "json" in content_type:
             return Response("{}", media_type="application/json")

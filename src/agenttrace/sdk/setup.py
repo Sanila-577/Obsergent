@@ -23,6 +23,11 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from agenttrace import config
 
+try:  # optional extra "langchain": without it only manual spans are recorded
+    from openinference.instrumentation.langchain import LangChainInstrumentor, get_current_span
+except ImportError:
+    LangChainInstrumentor = get_current_span = None
+
 
 def init(service_name: str, instrument_langchain: bool = True) -> TracerProvider:
     """Send this program's spans to AgentTrace; auto-trace LangChain/LangGraph if installed.
@@ -34,13 +39,9 @@ def init(service_name: str, instrument_langchain: bool = True) -> TracerProvider
     # Batch = collect spans and send them together every few seconds (fast), to /v1/traces.
     provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=f"{config.ENDPOINT}/v1/traces")))
     trace.set_tracer_provider(provider)  # make it the global provider
-    if instrument_langchain:
-        try:
-            # Hooks LangChain's callbacks: one span per graph node, model call and tool step.
-            from openinference.instrumentation.langchain import LangChainInstrumentor
-            LangChainInstrumentor().instrument(tracer_provider=provider)
-        except ImportError:
-            pass  # extra "langchain" not installed: only manual spans, no auto-tracing
+    if instrument_langchain and LangChainInstrumentor:
+        # Hooks LangChain's callbacks: one span per graph node, model call and tool step.
+        LangChainInstrumentor().instrument(tracer_provider=provider)
     return provider
 
 
@@ -52,12 +53,8 @@ def trace_tool_calls(session):
     original = session.call_tool  # keep the real method
 
     async def call_tool(name, arguments=None, *args, **kwargs):
-        span = None
-        try:  # inside LangGraph, the active tool span is tracked by the instrumentor
-            from openinference.instrumentation.langchain import get_current_span
-            span = get_current_span()
-        except ImportError:
-            pass
+        # Inside LangGraph the active tool span is tracked by the instrumentor, not by OpenTelemetry.
+        span = get_current_span() if get_current_span else None
         meta = dict(kwargs.pop("meta", None) or {})  # keep any meta the caller already set
         # With a span: write ITS context. Without: the ordinary current OpenTelemetry context.
         inject(meta, context=trace.set_span_in_context(span) if span else None)
@@ -80,5 +77,6 @@ def proxy_server(name: str, command: list[str], **connection) -> dict:
         # A dedicated name: the generic TRACEPARENT is often set by other tools.
         env["MCP_PROXY_TRACEPARENT"] = carrier["traceparent"]
     return {"transport": "stdio", "command": sys.executable,
-            "args": ["-m", "agenttrace", "proxy", "--name", name, "--", *command],
+            # The proxy is started through the cli module: `python -m agenttrace.cli proxy ...`
+            "args": ["-m", "agenttrace.cli", "proxy", "--name", name, "--", *command],
             "env": env, **connection}

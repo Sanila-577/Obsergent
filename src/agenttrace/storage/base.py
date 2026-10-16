@@ -39,3 +39,10 @@ class MetaStore(Protocol):
 
     def list_servers(self) -> list[dict]:
         """Every MCP server we have snapshots for, with how many versions of its tool list."""
+
+
+class Backend(Storage, MetaStore, Protocol):
+    """Everything the server needs from a database: spans AND metadata.
+
+    SQLiteStorage is one object that implements both, so callers take a single `Backend`.
+    """

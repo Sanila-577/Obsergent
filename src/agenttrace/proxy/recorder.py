@@ -15,6 +15,7 @@ from MCP_PROXY_TRACEPARENT, or starts a new trace (closed apps).
 """
 import json
 import os
+from typing import NamedTuple
 
 from opentelemetry import context, trace
 from opentelemetry.propagate import extract, inject
@@ -28,12 +29,18 @@ SESSION_ENV = "MCP_PROXY_TRACEPARENT"
 TOOLS_LIMIT = 200_000  # a tools/list result can be big; the drift check needs all of it
 
 
+class Pending(NamedTuple):
+    """A request that has been sent but not answered yet."""
+    span: trace.Span  # the open span of the request
+    method: str  # e.g. "tools/list": the response handler needs it
+
+
 class Recorder:
     def __init__(self, tracer: trace.Tracer, server_name: str):
         self.tracer = tracer
         self.server_name = server_name
-        # request id -> (open span, method). Filled on the request, emptied on the response.
-        self.pending: dict = {}
+        # request id -> Pending. Filled on the request, emptied on the response.
+        self.pending: dict[object, Pending] = {}
         tp = os.environ.get(SESSION_ENV)
         # With the variable: a context pointing at the agent's span.
         # Without it: an empty context, so every request starts its own trace.
@@ -64,7 +71,7 @@ class Recorder:
             span.set_attribute("mcp.resource.uri", str(params["uri"]))
         # Overwrite _meta.traceparent with THIS span's id: a traced server now sees the proxy span as its parent.
         inject(meta, context=trace.set_span_in_context(span))
-        self.pending[msg["id"]] = (span, method)
+        self.pending[msg["id"]] = Pending(span, method)
         return msg
 
     # ---------------------------------------------------------------- server -> client
@@ -75,7 +82,7 @@ class Recorder:
         entry = self.pending.pop(msg.get("id"), None)
         if entry is None:
             return msg  # a response we never saw the request for
-        span, method = entry
+        span, method = entry.span, entry.method
         if "error" in msg:  # protocol-level error (unknown method, invalid params...)
             err = msg["error"] if isinstance(msg["error"], dict) else {}
             span.set_status(Status(StatusCode.ERROR, str(err.get("message", "error"))))
@@ -94,16 +101,13 @@ class Recorder:
         return msg
 
     def close_ids(self, ids, reason: str) -> None:
-        """Close the spans of specific requests that will never get an answer (used by the HTTP proxy)."""
+        """Close the spans of requests that will never get an answer, marked as errors."""
         for msg_id in ids:
             entry = self.pending.pop(msg_id, None)
             if entry:
-                entry[0].set_status(Status(StatusCode.ERROR, reason))
-                entry[0].end()
+                entry.span.set_status(Status(StatusCode.ERROR, reason))
+                entry.span.end()
 
     def close_pending(self, reason: str = "connection closed") -> None:
-        """The connection ended: close every span still waiting for an answer, marked as an error."""
-        for span, _ in self.pending.values():
-            span.set_status(Status(StatusCode.ERROR, reason))
-            span.end()
-        self.pending.clear()
+        """The connection ended: close every span still waiting for an answer."""
+        self.close_ids(list(self.pending), reason)

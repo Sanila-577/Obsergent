@@ -6,7 +6,7 @@ Comparing two such lists tells us the first step where they differ.
 from agenttrace.models import Span
 
 
-def _steps(spans: list[Span]) -> list[tuple[str, str]]:
+def tool_steps(spans: list[Span]) -> list[tuple[str, str]]:
     """The run as an ordered list of (tool name, arguments) - what the agent actually did."""
     calls = [s for s in spans if s.attributes.get("mcp.method.name") == "tools/call"]
     calls.sort(key=lambda s: s.start_ns)
@@ -15,7 +15,7 @@ def _steps(spans: list[Span]) -> list[tuple[str, str]]:
 
 
 def first_divergence(run_a: list[Span], run_b: list[Span]) -> dict:
-    a, b = _steps(run_a), _steps(run_b)
+    a, b = tool_steps(run_a), tool_steps(run_b)
     # zip stops at the shorter run; a length difference is handled below
     for i, (step_a, step_b) in enumerate(zip(a, b, strict=False)):
         if step_a != step_b:

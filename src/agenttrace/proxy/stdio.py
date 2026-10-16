@@ -32,7 +32,7 @@ class StdioProxy:
         self.provider = make_provider(self.session)
         self.recorder = Recorder(self.provider.get_tracer("agenttrace.proxy"), server_name)
 
-    async def _pump(self, reader, write, handler):
+    async def pump(self, reader, write, handler):
         """Copy lines from reader to write(), letting `handler` record each message.
 
         Recording must never break the connection: if anything goes wrong, the
@@ -66,8 +66,8 @@ class StdioProxy:
             sys.stdout.buffer.write(data)
             sys.stdout.buffer.flush()
 
-        tasks = [asyncio.create_task(self._pump(stdin, to_server, self.recorder.on_request)),
-                 asyncio.create_task(self._pump(server.stdout, to_client, self.recorder.on_response))]
+        tasks = [asyncio.create_task(self.pump(stdin, to_server, self.recorder.on_request)),
+                 asyncio.create_task(self.pump(server.stdout, to_client, self.recorder.on_response))]
         # Stop when EITHER side closes: the client hung up, or the server exited.
         await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         for t in tasks:

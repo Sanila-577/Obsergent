@@ -36,8 +36,9 @@ def bench_ingest(tmp: Path, n_spans: int = 5000, batch: int = 500) -> None:
     tracer = provider.get_tracer("bench")
     for i in range(n_spans // 5):  # 5 spans per trace
         with tracer.start_as_current_span("agent.run"):
-            for _ in range(4):
+            for step in range(4):
                 with tracer.start_as_current_span("tools/call x") as s:
+                    s.set_attribute("step", step)
                     s.set_attribute("mcp.method.name", "tools/call")
                     s.set_attribute("mcp.tool.arguments", json.dumps({"i": i}))
     spans = mem.get_finished_spans()
@@ -85,14 +86,12 @@ def bench_proxy(tmp: Path) -> None:
         time.sleep(0.02)
     env = dict(os.environ, AGENTTRACE_ENDPOINT=f"http://127.0.0.1:{port}")
     direct_cmd = [sys.executable, str(BOOKSHOP)]
-    proxy_cmd = [sys.executable, "-m", "agenttrace", "proxy", "--name", "bench", "--", *direct_cmd]
+    proxy_cmd = [sys.executable, "-m", "agenttrace.cli", "proxy", "--name", "bench", "--", *direct_cmd]
     roundtrip_ms(direct_cmd, env)  # warm-up run: the first process start is always slower
     # Alternate direct/proxied runs and take the median, so noise affects both sides equally.
-    direct_runs, proxied_runs = [], []
-    for _ in range(5):
-        direct_runs.append(roundtrip_ms(direct_cmd, env))
-        proxied_runs.append(roundtrip_ms(proxy_cmd, env))
-    direct, proxied = statistics.median(direct_runs), statistics.median(proxied_runs)
+    runs = [(roundtrip_ms(direct_cmd, env), roundtrip_ms(proxy_cmd, env)) for repeat in range(5)]
+    direct = statistics.median(direct for direct, proxied in runs)
+    proxied = statistics.median(proxied for direct, proxied in runs)
     print(f"proxy:   {direct:.2f} ms per call directly, {proxied:.2f} ms through the proxy  "
           f"->  overhead {proxied - direct:.2f} ms per call  (median of 5 runs, {CALLS} calls each)")
     server.should_exit = True

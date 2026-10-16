@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 import uvicorn
+from opentelemetry.exporter.otlp.proto.common.trace_encoder import encode_spans
 
 from agenttrace.server.app import create_app
 from agenttrace.storage.sqlite import SQLiteStorage
@@ -25,6 +26,12 @@ INITIALIZED = {"jsonrpc": "2.0", "method": "notifications/initialized"}  # a not
 
 def call_msg(msg_id, name, arguments):
     return {"jsonrpc": "2.0", "id": msg_id, "method": "tools/call", "params": {"name": name, "arguments": arguments}}
+
+
+def post_spans(client, spans):
+    """Send OpenTelemetry spans to an AgentTrace app the way a real exporter does (OTLP/protobuf)."""
+    return client.post("/v1/traces", content=encode_spans(spans).SerializeToString(),
+                       headers={"content-type": "application/x-protobuf"})
 
 
 @pytest.fixture
@@ -48,7 +55,7 @@ def run_proxy(endpoint: str, server_cmd: list[str], messages: list[dict], name="
     """Start `agenttrace proxy`, send the messages like an MCP client, return the replies by id."""
     env = dict(os.environ, AGENTTRACE_ENDPOINT=endpoint, **(env_extra or {}))
     env.pop("MCP_PROXY_TRACEPARENT", None)  # a closed app sends none
-    proc = subprocess.Popen([sys.executable, "-m", "agenttrace", "proxy", "--name", name, "--", *server_cmd],
+    proc = subprocess.Popen([sys.executable, "-m", "agenttrace.cli", "proxy", "--name", name, "--", *server_cmd],
                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     replies, expected = {}, [m["id"] for m in messages if "id" in m]
     for m in messages:

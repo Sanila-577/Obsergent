@@ -91,17 +91,17 @@ class SQLiteStorage:
     def __init__(self, path: str | Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)  # ~/.agenttrace/ may not exist yet
-        self._migrate()
+        self.migrate()
 
-    def _db(self) -> sqlite3.Connection:
+    def connect(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path, timeout=10)  # wait up to 10 s if another process is writing
         db.execute("PRAGMA journal_mode=WAL")  # readers and one writer at the same time
         db.row_factory = sqlite3.Row  # rows behave like dicts
         return db
 
-    def _migrate(self) -> None:
+    def migrate(self) -> None:
         """Bring the file up to the latest schema version, one step at a time."""
-        with self._db() as db:
+        with self.connect() as db:
             version = db.execute("PRAGMA user_version").fetchone()[0]
             for step, script in enumerate(MIGRATIONS[version:], start=version + 1):
                 db.executescript(script)
@@ -113,7 +113,7 @@ class SQLiteStorage:
                  s.start_ns, s.end_ns, s.status_code, s.status_message,
                  json.dumps(s.attributes, default=str), json.dumps(s.events, default=str))
                 for s in spans]
-        with self._db() as db:
+        with self.connect() as db:
             # OR REPLACE: the same span exported twice just overwrites itself.
             db.executemany("INSERT OR REPLACE INTO spans VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", rows)
 
@@ -131,7 +131,7 @@ class SQLiteStorage:
             sql += " WHERE " + " AND ".join(where)
         sql += " ORDER BY start_ns DESC LIMIT ?"
         args.append(limit)
-        with self._db() as db:
+        with self.connect() as db:
             traces = [dict(r) for r in db.execute(sql, args)]
             for t in traces:  # name each trace after its root span
                 root = db.execute(
@@ -142,7 +142,7 @@ class SQLiteStorage:
         return traces
 
     def get_trace(self, trace_id: str) -> list[Span]:
-        with self._db() as db:
+        with self.connect() as db:
             rows = db.execute("SELECT * FROM spans WHERE trace_id=? ORDER BY start_ns", (trace_id,)).fetchall()
         return [Span(trace_id=r["trace_id"], span_id=r["span_id"], parent_span_id=r["parent_span_id"],
                      name=r["name"], kind=r["kind"], service=r["service"], start_ns=r["start_ns"],
@@ -151,19 +151,19 @@ class SQLiteStorage:
                 for r in rows]
 
     def resolve_trace_id(self, prefix: str) -> str | None:
-        with self._db() as db:
+        with self.connect() as db:
             row = db.execute("SELECT trace_id FROM spans WHERE trace_id LIKE ? LIMIT 1",
                              (prefix + "%",)).fetchone()
         return row["trace_id"] if row else None
 
     # ---------------------------------------------------------------- MetaStore
     def list_sessions(self, limit: int = 50) -> list[dict]:
-        with self._db() as db:
+        with self.connect() as db:
             return [dict(r) for r in db.execute(
                 "SELECT * FROM sessions ORDER BY start_ns DESC LIMIT ?", (limit,))]
 
     def save_tool_snapshot(self, server_name: str, tools: list[dict], seen_ns: int) -> bool:
-        with self._db() as db:
+        with self.connect() as db:
             # INSERT OR IGNORE + UNIQUE(server_name, fingerprint): an unchanged tool list is a no-op.
             cur = db.execute(
                 "INSERT OR IGNORE INTO tool_snapshots (server_name, fingerprint, first_seen_ns, tools) "
@@ -172,14 +172,14 @@ class SQLiteStorage:
             return cur.rowcount == 1  # 1 = a new version of the tool list
 
     def list_tool_snapshots(self, server_name: str) -> list[dict]:
-        with self._db() as db:
+        with self.connect() as db:
             rows = db.execute("SELECT * FROM tool_snapshots WHERE server_name=? ORDER BY first_seen_ns, id",
                               (server_name,)).fetchall()
         return [{"id": r["id"], "fingerprint": r["fingerprint"], "first_seen_ns": r["first_seen_ns"],
                  "tools": json.loads(r["tools"])} for r in rows]
 
     def list_servers(self) -> list[dict]:
-        with self._db() as db:
+        with self.connect() as db:
             return [dict(r) for r in db.execute(
                 "SELECT server_name, COUNT(*) AS versions, MIN(first_seen_ns) AS first_seen_ns, "
                 "MAX(first_seen_ns) AS last_change_ns FROM tool_snapshots GROUP BY server_name "

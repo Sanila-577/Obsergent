@@ -9,7 +9,7 @@ queue worker in server mode) without a web server.
 import json
 
 from agenttrace.models import Span
-from agenttrace.storage.base import MetaStore, Storage
+from agenttrace.storage.base import Backend
 
 
 def tool_lists(spans: list[Span]) -> list[tuple[str, list[dict], int]]:
@@ -30,9 +30,9 @@ def tool_lists(spans: list[Span]) -> list[tuple[str, list[dict], int]]:
     return found
 
 
-def ingest_spans(spans: list[Span], store: Storage, meta: MetaStore) -> dict:
+def ingest_spans(spans: list[Span], backend: Backend) -> dict:
     """Save spans and remember any new version of an MCP server's tool list."""
-    store.save_spans(spans)
-    new_snapshots = [server for server, tools, ts in tool_lists(spans)
-                     if meta.save_tool_snapshot(server, tools, ts)]
+    backend.save_spans(spans)
+    new_snapshots = [server for server, tools, seen_ns in tool_lists(spans)
+                     if backend.save_tool_snapshot(server, tools, seen_ns)]
     return {"spans": len(spans), "new_tool_snapshots": new_snapshots}

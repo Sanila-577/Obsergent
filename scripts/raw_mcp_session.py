@@ -23,7 +23,7 @@ args = parser.parse_args()
 
 # Exactly what Claude Desktop would start: `agenttrace proxy --name X -- <real server command>`.
 proc = subprocess.Popen(
-    [sys.executable, "-m", "agenttrace", "proxy", "--name", args.name, "--", sys.executable, args.server],
+    [sys.executable, "-m", "agenttrace.cli", "proxy", "--name", args.name, "--", sys.executable, args.server],
     stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
 
 messages = [

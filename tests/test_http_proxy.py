@@ -1,14 +1,15 @@
 """The Streamable HTTP proxy, with a fake upstream MCP server (httpx.MockTransport)."""
 import json
+from typing import NamedTuple
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from agenttrace.proxy.http import create_proxy_app
-from agenttrace.proxy.sessions import Session
 
 UPSTREAM = "http://upstream.test/mcp?token=SECRET"
 
@@ -35,77 +36,72 @@ def fake_upstream(request: httpx.Request) -> httpx.Response:
                                      "result": {"content": [{"type": "text", "text": "found"}]}})
 
 
-def make_client():
-    mem = InMemorySpanExporter()
-    sessions: list[Session] = []
+class Harness(NamedTuple):
+    client: TestClient  # talks to the proxy
+    spans: InMemorySpanExporter  # what the proxy recorded
+    sessions: list  # the Session objects the proxy created
 
-    def factory(session):  # capture spans in memory instead of sending them anywhere
+
+@pytest.fixture
+def harness():
+    spans = InMemorySpanExporter()
+    sessions = []
+
+    def provider_factory(session):  # capture spans in memory instead of sending them anywhere
         sessions.append(session)
         provider = TracerProvider()
-        provider.add_span_processor(SimpleSpanProcessor(mem))
+        provider.add_span_processor(SimpleSpanProcessor(spans))
         return provider
 
-    app = create_proxy_app({"demo": UPSTREAM}, provider_factory=factory, transport=httpx.MockTransport(fake_upstream))
-    return TestClient(app), mem, sessions
+    app = create_proxy_app({"demo": UPSTREAM}, provider_factory=provider_factory,
+                           transport=httpx.MockTransport(fake_upstream))
+    with TestClient(app) as client:  # the with-block runs the app's start-up and shut-down
+        yield Harness(client, spans, sessions)
 
 
 def rpc(msg_id, method, **params):
     return {"jsonrpc": "2.0", "id": msg_id, "method": method, "params": params}
 
 
-def test_json_responses_are_recorded_and_forwarded_unchanged():
-    client, mem, _ = make_client()
-    with client:
-        r = client.post("/mcp/demo", json=rpc(1, "initialize"))
-        assert r.json()["result"]["serverInfo"]["name"] == "Remote"
-        assert r.headers["mcp-session-id"] == "abc"  # the client needs this header back
-        r = client.post("/mcp/demo", json=rpc(2, "tools/call", name="search", arguments={"q": "x", "password": "p"}))
-        assert r.json()["result"]["content"][0]["text"] == "found"
-    names = [s.name for s in mem.get_finished_spans()]
-    assert names == ["initialize", "tools/call search"]
-    call = mem.get_finished_spans()[1]
-    assert call.attributes["mcp.tool.arguments"] == '{"password": "***", "q": "x"}'
+def test_json_responses_are_recorded_and_forwarded_unchanged(harness):
+    reply = harness.client.post("/mcp/demo", json=rpc(1, "initialize"))
+    assert reply.json()["result"]["serverInfo"]["name"] == "Remote"
+    assert reply.headers["mcp-session-id"] == "abc"  # the client needs this header back
+    reply = harness.client.post("/mcp/demo", json=rpc(2, "tools/call", name="search",
+                                                      arguments={"q": "x", "password": "p"}))
+    assert reply.json()["result"]["content"][0]["text"] == "found"
+    recorded = harness.spans.get_finished_spans()
+    assert [span.name for span in recorded] == ["initialize", "tools/call search"]
+    assert recorded[1].attributes["mcp.tool.arguments"] == '{"password": "***", "q": "x"}'
 
 
-def test_notifications_get_202_and_no_span():
-    client, mem, _ = make_client()
-    with client:
-        r = client.post("/mcp/demo", json={"jsonrpc": "2.0", "method": "notifications/initialized"})
-    assert r.status_code == 202 and mem.get_finished_spans() == ()
+def test_notifications_get_202_and_no_span(harness):
+    reply = harness.client.post("/mcp/demo", json={"jsonrpc": "2.0", "method": "notifications/initialized"})
+    assert reply.status_code == 202 and harness.spans.get_finished_spans() == ()
 
 
-def test_sse_streams_are_relayed_and_recorded():
-    client, mem, _ = make_client()
-    with client:
-        r = client.post("/mcp/demo", json=rpc(1, "tools/call", name="stream_me", arguments={}))
-    assert r.headers["content-type"].startswith("text/event-stream")
-    assert "streamed" in r.text  # the client still receives the stream
-    (span,) = mem.get_finished_spans()
+def test_sse_streams_are_relayed_and_recorded(harness):
+    reply = harness.client.post("/mcp/demo", json=rpc(1, "tools/call", name="stream_me", arguments={}))
+    assert reply.headers["content-type"].startswith("text/event-stream")
+    assert "streamed" in reply.text  # the client still receives the stream
+    (span,) = harness.spans.get_finished_spans()
     assert "streamed" in span.attributes["mcp.result"]
 
 
-def test_tools_list_is_captured_for_snapshots():
-    client, mem, _ = make_client()
-    with client:
-        client.post("/mcp/demo", json=rpc(1, "tools/list"))
-    (span,) = mem.get_finished_spans()
+def test_tools_list_is_captured_for_snapshots(harness):
+    harness.client.post("/mcp/demo", json=rpc(1, "tools/list"))
+    (span,) = harness.spans.get_finished_spans()
     assert json.loads(span.attributes["mcp.tools"])[0]["name"] == "search"
 
 
-def test_session_never_stores_the_url_query():
-    _, _, sessions = make_client()
-    assert sessions[0].command == ["http:upstream.test/mcp"]  # ?token=SECRET is dropped
+def test_session_never_stores_the_url_query(harness):
+    assert harness.sessions[0].command == ["http:upstream.test/mcp"]  # ?token=SECRET is dropped
 
 
-def test_unknown_server_is_404():
-    client, _, _ = make_client()
-    with client:
-        assert client.post("/mcp/nope", json=rpc(1, "initialize")).status_code == 404
+def test_unknown_server_is_404(harness):
+    assert harness.client.post("/mcp/nope", json=rpc(1, "initialize")).status_code == 404
 
 
-def test_batches_are_supported():
-    client, mem, _ = make_client()
-    with client:
-        # JSON-RPC batch: a list of messages in one POST
-        client.post("/mcp/demo", json=[rpc(1, "tools/list")])
-    assert len(mem.get_finished_spans()) == 1
+def test_batches_are_supported(harness):
+    harness.client.post("/mcp/demo", json=[rpc(1, "tools/list")])  # JSON-RPC batch: a list in one POST
+    assert len(harness.spans.get_finished_spans()) == 1

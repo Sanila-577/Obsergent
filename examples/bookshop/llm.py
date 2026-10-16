@@ -16,15 +16,13 @@ from langchain_core.messages import (  # AIMessage = model reply; ToolMessage = 
     ToolMessage,
 )
 from langchain_core.outputs import ChatGeneration, ChatResult  # wrappers LangChain expects a model to return
+from langchain_ollama import ChatOllama  # the free local model (Ollama)
 
 
 def get_llm():
     """Return the chat model the agent should use: fake one or real Ollama."""
     if os.environ.get("FAKE_LLM") == "1":  # e.g. FAKE_LLM=1 python agent.py
         return ScriptedFakeLLM()
-    # Imported only here, so FAKE_LLM mode works even if langchain_ollama isn't installed.
-    from langchain_ollama import ChatOllama
-
     return ChatOllama(
         # Which local model to run; override with OLLAMA_MODEL=llama3.2:3b
         model=os.environ.get("OLLAMA_MODEL", "qwen2.5:7b"),
@@ -34,7 +32,7 @@ def get_llm():
     )
 
 
-def _text(message) -> str:
+def message_text(message) -> str:
     """Tool results can be a string or a list of content blocks; return plain text."""
     content = message.content
     if isinstance(content, list):
@@ -51,6 +49,7 @@ class ScriptedFakeLLM(BaseChatModel):
         # script, so it ignores them and just returns itself.
         return self
 
+    # `_llm_type` and `_generate` keep their underscores: LangChain requires exactly these names.
     @property
     def _llm_type(self) -> str:
         return "scripted-fake"  # name LangChain shows in logs and traces
@@ -66,13 +65,13 @@ class ScriptedFakeLLM(BaseChatModel):
                 {"name": "search_books", "args": {"query": "python"}, "id": "call_1"}])
         elif len(tool_results) == 1:
             # Step 2: we have search results -> take the first hit's id and ask for its price.
-            hits = json.loads(_text(tool_results[0]) or "[]")
+            hits = json.loads(message_text(tool_results[0]) or "[]")
             book_id = hits[0]["id"] if hits else "b1"  # fall back to b1 if nothing found
             msg = AIMessage(content="", tool_calls=[
                 {"name": "get_price_and_stock", "args": {"book_id": book_id}, "id": "call_2"}])
         else:
             # Step 3: we have the price -> write the final answer (no tool call, so the graph ends).
-            info = json.loads(_text(tool_results[-1]))
+            info = json.loads(message_text(tool_results[-1]))
             msg = AIMessage(content=f"Book {info['id']} costs ${info['price_usd']} "
                                     f"and there are {info['in_stock']} copies in stock.")
         return ChatResult(generations=[ChatGeneration(message=msg)])
