@@ -215,6 +215,21 @@ class SQLiteStorage:
         self.migrate()
 
     def connect(self) -> sqlite3.Connection:
+        """Open the database, making sure the tables exist.
+
+        The file can disappear while the server runs (`make reset-db` deletes it). SQLite then quietly creates a new,
+        EMPTY file with no tables, and every query would fail with "no such table" (an HTTP 500). So every connection
+        checks the schema version and re-creates the tables when the file is new: the pages then simply show "no data yet".
+        """
+        # The folder may have been deleted too.
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        db = self.open()
+        # A new or emptied file reports version 0; an up-to-date one reports len(MIGRATIONS).
+        if db.execute("PRAGMA user_version").fetchone()[0] < len(MIGRATIONS):
+            self.upgrade(db)
+        return db
+
+    def open(self) -> sqlite3.Connection:
         # Open the database file; timeout=10 means "if another process is writing, wait up to 10 seconds".
         db = sqlite3.connect(self.path, timeout=10)  # wait up to 10 s if another process is writing
         # WAL mode lets readers and one writer work at the same time (the server, the proxies and the CLI share the file).
@@ -224,18 +239,21 @@ class SQLiteStorage:
         # Hand the open connection to the caller.
         return db
 
+    def upgrade(self, db: sqlite3.Connection) -> None:
+        """Apply the schema steps this file has not had yet, one at a time."""
+        # SQLite stores a small integer called user_version inside the file; a new file has 0.
+        version = db.execute("PRAGMA user_version").fetchone()[0]
+        # Run only the steps the file has not had yet; `start` makes `step` the schema version number.
+        for step, script in enumerate(MIGRATIONS[version:], start=version + 1):
+            # executescript runs a whole block of SQL statements.
+            db.executescript(script)
+            # Record the new version, so the step is never repeated.
+            db.execute(f"PRAGMA user_version = {step}")
+        db.commit()
+
     def migrate(self) -> None:
-        """Bring the file up to the latest schema version, one step at a time."""
-        # `with` commits the changes when the block ends.
-        with self.connect() as db:
-            # SQLite stores a small integer called user_version inside the file; a new file has 0.
-            version = db.execute("PRAGMA user_version").fetchone()[0]
-            # Run only the steps the file has not had yet; `start` makes `step` the schema version number.
-            for step, script in enumerate(MIGRATIONS[version:], start=version + 1):
-                # executescript runs a whole block of SQL statements.
-                db.executescript(script)
-                # Record the new version, so the step is never repeated.
-                db.execute(f"PRAGMA user_version = {step}")
+        """Bring the file up to the latest schema version (called once at start-up; connect() also guards every use)."""
+        self.connect().close()
 
     # ------------------------------------------------------------------ Storage
     def save_spans(self, spans: list[Span]) -> None:

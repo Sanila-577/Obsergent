@@ -58,10 +58,10 @@ model change the `LLM_*` lines:
 | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Ollama (default)                                                                   | `LLM_PROVIDER=ollama` `LLM_MODEL=qwen2.5:7b`                                                                                          |
 | OpenAI                                                                             | `LLM_PROVIDER=openai` `LLM_MODEL=gpt-4o-mini` `OPENAI_API_KEY=...`                                                                  |
-| Anthropic                                                                          | `LLM_PROVIDER=anthropic` `LLM_MODEL=claude-sonnet-4-5` `ANTHROPIC_API_KEY=...` (`uv pip install langchain-anthropic`)      |
+| Anthropic                                                                          | `LLM_PROVIDER=anthropic` `LLM_MODEL=claude-sonnet-4-5` `ANTHROPIC_API_KEY=...` (`uv pip install langchain-anthropic`)             |
 | Groq / OpenRouter / Hugging Face / Together / Fireworks / DeepSeek / Mistral / xAI | `LLM_PROVIDER=groq` (or `openrouter`, `huggingface`, ...) `LLM_MODEL=<name>` and that service's key (`.env.example` lists each) |
 | Your own server (vLLM, llama.cpp, LM Studio, LiteLLM)                              | `LLM_PROVIDER=openai_compatible` `LLM_BASE_URL=http://localhost:8000/v1` `LLM_MODEL=<name>`                                         |
-| Anything else LangChain knows (Bedrock, Cohere, ...)                               | `LLM_PROVIDER=<its name>` `LLM_MODEL=<name>` after `uv pip install langchain-<provider>`                                     |
+| Anything else LangChain knows (Bedrock, Cohere, ...)                               | `LLM_PROVIDER=<its name>` `LLM_MODEL=<name>` after `uv pip install langchain-<provider>`                                            |
 
 The model must support tool calling. Most hosted and open-source services speak the OpenAI API, so one client reaches all
 of them (details in [examples/bookshop/llm.py](examples/bookshop/llm.py)).
@@ -97,13 +97,13 @@ cd ui && npm run dev                       # terminal 2: http://localhost:5173, 
 
 ### If something does not start
 
-| Symptom                                              | Fix                                                                                                                                   |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `agenttrace: command not found`                    | The environment is not active: `source .venv/bin/activate` (the `make` targets work without it)                                  |
-| The browser shows`{"detail":"Not Found"}` at `/` | The UI is not built:`make ui-build`                                                                                                 |
-| `address already in use` on port 7318              | Another`agenttrace up` runs. Stop it, or change `server.port` in `config.yaml` (it applies to the server and every client)                     |
-| The UI says "server unreachable"                     | `agenttrace up` is not running (or uses another port than the UI's dev proxy: `AGENTTRACE_API=http://127.0.0.1:PORT npm run dev`) |
-| No runs appear                                       | The agent and the server must use the same `config.yaml` (`storage.path`, `server.port`); `agenttrace up` prints the database it uses; `agenttrace config` shows all settings    |
+| Symptom                                              | Fix                                                                                                                                                                                    |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agenttrace: command not found`                    | The environment is not active:`source .venv/bin/activate` (the `make` targets work without it)                                                                                     |
+| The browser shows`{"detail":"Not Found"}` at `/` | The UI is not built:`make ui-build`                                                                                                                                                  |
+| `address already in use` on port 7318              | Another`agenttrace up` runs. Stop it, or change `server.port` in `config.yaml` (it applies to the server and every client)                                                       |
+| The UI says "server unreachable"                     | `agenttrace up` is not running (or uses another port than the UI's dev proxy: `AGENTTRACE_API=http://127.0.0.1:PORT npm run dev`)                                                  |
+| No runs appear                                       | The agent and the server must use the same`config.yaml` (`storage.path`, `server.port`); `agenttrace up` prints the database it uses; `agenttrace config` shows all settings |
 
 ---
 
@@ -199,6 +199,7 @@ sampling_rate = 1.0
 ```bash
 docker compose up                             # [gateway repo] the gateway: controller :9090, router :8080 (-d = in the background)
 ```
+
 ```bash
 make up-grpc                                  # AgentTrace + UI (http://127.0.0.1:7318) + the gateway's gRPC trace receiver (:4317)
 make mcp-http                                 # the MCP server the gateway protects (:9100)
@@ -338,14 +339,14 @@ Attribute names follow OpenTelemetry (`mcp.method.name`, `gen_ai.tool.name`...).
 
 ## 10. CLI
 
-| Command                                                                                    | What it does                                               |
-| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| `agenttrace up [--grpc]`                                                                 | start the server (and the OTLP/gRPC receiver on port 4317) |
-| `agenttrace proxy --name X -- <cmd>`                                                     | run a stdio MCP server behind the recording proxy          |
-| `agenttrace proxy-http [--name X] [--url URL] [--port N] [--ca-bundle FILE \| --insecure]` | record a remote Streamable-HTTP server or a gateway (defaults from `config.yaml`) |
-| `agenttrace traces [--limit N] [--session ID]` · `show <id>`                          | list runs · print one as a tree                           |
-| `agenttrace sessions` · `drift [server]`                                              | proxy sessions · tools whose description changed          |
-| `agenttrace config [key]`                                                                  | show the settings in use (or one, e.g. `server.port`)       |
+| Command                                                                                     | What it does                                                                       |
+| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `agenttrace up [--grpc]`                                                                  | start the server (and the OTLP/gRPC receiver on port 4317)                         |
+| `agenttrace proxy --name X -- <cmd>`                                                      | run a stdio MCP server behind the recording proxy                                  |
+| `agenttrace proxy-http [--name X] [--url URL] [--port N] [--ca-bundle FILE \| --insecure]` | record a remote Streamable-HTTP server or a gateway (defaults from`config.yaml`) |
+| `agenttrace traces [--limit N] [--session ID]` · `show <id>`                           | list runs · print one as a tree                                                   |
+| `agenttrace sessions` · `drift [server]`                                               | proxy sessions · tools whose description changed                                  |
+| `agenttrace config [key]`                                                                 | show the settings in use (or one, e.g.`server.port`)                             |
 
 `traces`, `show`, `sessions` and `drift` read the SQLite file directly, so they work without the server.
 
@@ -358,19 +359,19 @@ it, so a value is changed in one place. Precedence: an environment variable, the
 (AgentTrace also works with no config file). `agenttrace config` prints what is in use; `AGENTTRACE_CONFIG=/path/x.yaml`
 uses another file.
 
-| `config.yaml` key | Default | Environment override | Meaning |
-| --- | --- | --- | --- |
-| `server.host` / `server.port` | `127.0.0.1` / `7318` | `AGENTTRACE_HOST` / `AGENTTRACE_PORT` | where `agenttrace up` listens (UI, REST API, OTLP/HTTP) |
-| `server.grpc_port` | `4317` | `AGENTTRACE_GRPC_PORT` | the OTLP/gRPC receiver (`up --grpc`) |
-| `server.endpoint` | empty = `http://<host>:<port>` | `AGENTTRACE_ENDPOINT` | where the SDK and proxies send spans |
-| `storage.path` | `~/.agenttrace/agenttrace.db` | `AGENTTRACE_DB` | the SQLite file |
-| `recording.max_attr_chars` | `4000` | `AGENTTRACE_MAX_ATTR_CHARS` | longest value kept in one span attribute |
-| `proxy.host` / `proxy.port` | `127.0.0.1` / `7319` | `AGENTTRACE_PROXY_PORT` | `agenttrace proxy-http` |
-| `gateway.router` | `http://localhost:8080` | `GATEWAY_ROUTER` | where MCP traffic enters the WSO2 gateway |
-| `gateway.controller` | `http://localhost:9090/api/management/v1` | `GATEWAY_CONTROLLER` | the gateway's management API (`make register`) |
-| `gateway.username` | `admin` | `WSO2AP_GW_USERNAME` | gateway admin user |
-| `gateway.mcp_name` / `gateway.mcp_context` | `wso2` / `/bookshop` | | the proxy's name in AgentTrace, the MCP server's path in the gateway |
-| `bookshop.http_port` | `9100` | `BOOKSHOP_PORT` | the example MCP server over HTTP |
+| `config.yaml` key                            | Default                                     | Environment override                      | Meaning                                                              |
+| ---------------------------------------------- | ------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------- |
+| `server.host` / `server.port`              | `127.0.0.1` / `7318`                    | `AGENTTRACE_HOST` / `AGENTTRACE_PORT` | where`agenttrace up` listens (UI, REST API, OTLP/HTTP)             |
+| `server.grpc_port`                           | `4317`                                    | `AGENTTRACE_GRPC_PORT`                  | the OTLP/gRPC receiver (`up --grpc`)                               |
+| `server.endpoint`                            | empty =`http://<host>:<port>`             | `AGENTTRACE_ENDPOINT`                   | where the SDK and proxies send spans                                 |
+| `storage.path`                               | `~/.agenttrace/agenttrace.db`             | `AGENTTRACE_DB`                         | the SQLite file                                                      |
+| `recording.max_attr_chars`                   | `4000`                                    | `AGENTTRACE_MAX_ATTR_CHARS`             | longest value kept in one span attribute                             |
+| `proxy.host` / `proxy.port`                | `127.0.0.1` / `7319`                    | `AGENTTRACE_PROXY_PORT`                 | `agenttrace proxy-http`                                            |
+| `gateway.router`                             | `http://localhost:8080`                   | `GATEWAY_ROUTER`                        | where MCP traffic enters the WSO2 gateway                            |
+| `gateway.controller`                         | `http://localhost:9090/api/management/v1` | `GATEWAY_CONTROLLER`                    | the gateway's management API (`make register`)                     |
+| `gateway.username`                           | `admin`                                   | `WSO2AP_GW_USERNAME`                    | gateway admin user                                                   |
+| `gateway.mcp_name` / `gateway.mcp_context` | `wso2` / `/bookshop`                    |                                           | the proxy's name in AgentTrace, the MCP server's path in the gateway |
+| `bookshop.http_port`                         | `9100`                                    | `BOOKSHOP_PORT`                         | the example MCP server over HTTP                                     |
 
 Secrets are never in `config.yaml`: the gateway password is the environment variable `WSO2AP_GW_PASSWORD`, and the language
 model's settings and API keys are in `.env` (copied from `.env.example`, git-ignored; section 1, Step 2). The UI's dev server

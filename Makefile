@@ -38,13 +38,35 @@ env:  ## create .env (language model settings) from .env.example if it does not 
 setup: install ui-install ui-build env  ## all of the above
 
 ##@ Run AgentTrace
-.PHONY: up up-grpc traces
-up:  ## the server + web UI at http://127.0.0.1:7318
+.PHONY: up up-grpc free-ports
+# free-ports: stop whatever listens on the ports AgentTrace is about to use (server.port, and server.grpc_port), for
+# example an `agenttrace up` you started earlier. The ports come from config.yaml.
+define kill_port
+pids=$$(lsof -ti tcp:$(1) -sTCP:LISTEN 2>/dev/null); if [ -n "$$pids" ]; then echo "port $(1) is in use: stopping $$pids"; kill $$pids; sleep 1; fi
+endef
+free-ports:  ## stop whatever listens on AgentTrace's server and gRPC ports (done automatically by up and up-grpc)
+	@$(call kill_port,$$($(VENV_BIN)/agenttrace config server.port))
+	@$(call kill_port,$$($(VENV_BIN)/agenttrace config server.grpc_port))
+up:  ## the server + web UI at http://127.0.0.1:7318 (first stops anything already on that port)
+	@$(call kill_port,$$($(VENV_BIN)/agenttrace config server.port))
 	$(VENV_BIN)/agenttrace up
-up-grpc:  ## same, plus the gRPC receiver on :4317 (needed for the WSO2 gateway's own traces)
+up-grpc:  ## same, plus the gRPC receiver on :4317 (first stops anything on either port)
+	@$(MAKE) --no-print-directory free-ports
 	$(VENV_BIN)/agenttrace up --grpc
-traces:  ## list the recorded runs in the terminal
-	$(VENV_BIN)/agenttrace traces
+
+##@ Look at what was recorded (terminal; the web UI shows the same)
+.PHONY: traces show sessions drift config
+traces:  ## list the recorded runs, newest first (LIMIT=N for more, default 20)
+	$(VENV_BIN)/agenttrace traces --limit $(or $(LIMIT),20)
+show:  ## one run as a span tree: make show ID=<first characters of a run id from `make traces`>
+	@test -n "$(ID)" || { echo "usage: make show ID=<run id or its first characters>  (ids are listed by: make traces)"; exit 1; }
+	$(VENV_BIN)/agenttrace show $(ID)
+sessions:  ## list proxy sessions (one per proxy process, e.g. what Claude Desktop did)
+	$(VENV_BIN)/agenttrace sessions
+drift:  ## MCP servers whose tool descriptions changed since first seen
+	$(VENV_BIN)/agenttrace drift
+config:  ## the settings in use (config.yaml + environment)
+	$(VENV_BIN)/agenttrace config
 
 ##@ With a WSO2 gateway (it must be running: README section 4)
 .PHONY: mcp-http register register-deny proxy traffic

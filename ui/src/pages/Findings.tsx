@@ -37,7 +37,7 @@ export function Findings() {
         <Segmented value={severity} onChange={setSeverity} options={[{ id: "all", label: "All" }, { id: "high", label: "High" }, { id: "medium", label: "Medium" }, { id: "low", label: "Low" }]} />
         <label className="check"><input type="checkbox" checked={showAcknowledged} onChange={(e) => setShowAcknowledged(e.target.checked)} /> Show dismissed</label>
       </PageHead>
-      <QueryState query={findings} empty={{ when: (f) => f.length === 0, title: "All clear", hint: <p>No drift, risky tools, injection-like text, loops or refused calls right now.</p> }}>
+      <QueryState query={findings} empty={{ when: (f) => f.length === 0, title: "No findings yet", hint: <p>Nothing has been recorded yet, or nothing recorded needs a look: no drift, risky tools, injection-like text, loops or refused calls.</p> }}>
         {(all) => {
           const types = [...new Set(all.map((f) => f.type))];
           const rows = all.filter((f) => (severity === "all" || f.severity === severity) && (!type || f.type === type));

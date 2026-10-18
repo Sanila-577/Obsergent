@@ -58,7 +58,7 @@ What they do:
 | Command | Detail |
 |---|---|
 | `docker compose up` | Starts the controller and the Envoy router from the published 1.2.1 images (building them yourself needs Go 1.25+ and is not required). The gateway has no UI of its own. |
-| `make up-grpc` | `agenttrace up --grpc`; the gateway's `[tracing] endpoint` must point at `server.grpc_port` |
+| `make up-grpc` | stops anything already listening on `server.port` / `server.grpc_port` (such as an earlier `agenttrace up`), then runs `agenttrace up --grpc`; the gateway's `[tracing] endpoint` must point at `server.grpc_port` |
 | `make mcp-http` | `examples/bookshop/bookshop_http.py --host 0.0.0.0`; inside Docker the gateway reaches it as `http://host.docker.internal:9100/mcp` |
 | `make register` | One `POST <gateway.controller>/mcp-proxies` (default `http://localhost:9090/api/management/v1`) with a `kind: Mcp` body (same shape as `gateway/examples/mcp-proxy.yaml`); running it again updates the proxy |
 | `make proxy` | `agenttrace proxy-http` (name, URL and port from `config.yaml`: `--name wso2 --url http://localhost:8080/bookshop/mcp`); clients use `http://127.0.0.1:7319/mcp/wso2` |
