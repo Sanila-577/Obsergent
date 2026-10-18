@@ -1,77 +1,79 @@
-"""llm.py - which language model the agent uses.
+"""llm.py - which language model the agent uses. Configured in the .env file in the repository root.
 
-Default: a free local model through Ollama.
-    ollama pull qwen2.5:7b        # 16 GB RAM or more
-    ollama pull llama3.2:3b       # 8 GB RAM  (then: export OLLAMA_MODEL=llama3.2:3b)
-No Ollama yet? Set FAKE_LLM=1 to use a scripted stand-in model, so you can
-still run and trace the whole agent.
+    LLM_PROVIDER   ollama (default) | openai | anthropic | google | groq | openrouter | huggingface | together |
+                   fireworks | deepseek | mistral | xai | perplexity | lmstudio | openai_compatible | any other
+                   provider LangChain knows (bedrock, cohere, ...)
+    LLM_MODEL      the model name at that provider, e.g. qwen2.5:7b, gpt-4o-mini, llama-3.3-70b-versatile
+    LLM_API_KEY    optional: the key (otherwise the provider's usual variable is used, e.g. GROQ_API_KEY)
+    LLM_BASE_URL   optional: another server address (any OpenAI-compatible server: vLLM, llama.cpp, LM Studio, ...)
+
+How it adapts: most hosted and open-source model services (Groq, OpenRouter, Hugging Face, Together, Fireworks,
+DeepSeek, vLLM, ...) speak the OpenAI API, so they are all reached with one client and a different address and key.
+Ollama, Anthropic and Google use their own clients. See `.env.example` for a ready line for each provider.
 """
-import json  # to read the JSON text that the MCP tools return
-import os  # to read environment variables (FAKE_LLM, OLLAMA_MODEL, OLLAMA_HOST)
-from typing import Any  # type hint for "anything"
+# os reads environment variables.
+import os
 
-from langchain_core.language_models.chat_models import BaseChatModel  # base class every chat model extends
-from langchain_core.messages import (  # AIMessage = model reply; ToolMessage = a tool's result
-    AIMessage,
-    ToolMessage,
-)
-from langchain_core.outputs import ChatGeneration, ChatResult  # wrappers LangChain expects a model to return
-from langchain_ollama import ChatOllama  # the free local model (Ollama)
+# Path locates the .env file.
+from pathlib import Path
+
+# load_dotenv copies the lines of a .env file into the environment.
+from dotenv import load_dotenv
+
+# init_chat_model builds a chat model for a provider from a model name.
+from langchain.chat_models import init_chat_model
+
+# The repository root holds .env (this file is examples/bookshop/llm.py). Variables already set in the shell win.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
+
+# OpenAI-compatible services: provider -> (base URL, the variable that normally holds its key).
+OPENAI_COMPATIBLE = {
+    "groq": ("https://api.groq.com/openai/v1", "GROQ_API_KEY"),
+    "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
+    "huggingface": ("https://router.huggingface.co/v1", "HF_TOKEN"),
+    "together": ("https://api.together.xyz/v1", "TOGETHER_API_KEY"),
+    "fireworks": ("https://api.fireworks.ai/inference/v1", "FIREWORKS_API_KEY"),
+    "deepseek": ("https://api.deepseek.com/v1", "DEEPSEEK_API_KEY"),
+    "mistral": ("https://api.mistral.ai/v1", "MISTRAL_API_KEY"),
+    "xai": ("https://api.x.ai/v1", "XAI_API_KEY"),
+    "perplexity": ("https://api.perplexity.ai", "PERPLEXITY_API_KEY"),
+    "lmstudio": ("http://localhost:1234/v1", ""),  # a local server, no key needed
+    "openai_compatible": ("", "OPENAI_API_KEY"),  # your own server: set LLM_BASE_URL
+}
+# Providers whose LangChain name differs from the name used in .env.
+LANGCHAIN_NAMES = {"google": "google_genai"}
+# Used when LLM_MODEL is empty (only Ollama has a default; for the others you choose).
+DEFAULT_MODELS = {"ollama": "qwen2.5:7b"}
 
 
 def get_llm():
-    """Return the chat model the agent should use: fake one or real Ollama."""
-    if os.environ.get("FAKE_LLM") == "1":  # e.g. FAKE_LLM=1 python agent.py
-        return ScriptedFakeLLM()
-    return ChatOllama(
-        # Which local model to run; override with OLLAMA_MODEL=llama3.2:3b
-        model=os.environ.get("OLLAMA_MODEL", "qwen2.5:7b"),
-        # Where the Ollama server listens (its default port is 11434).
-        base_url=os.environ.get("OLLAMA_HOST", "http://localhost:11434"),
-        temperature=0,  # 0 = no randomness, so the same question gives the same answer
-    )
-
-
-def message_text(message) -> str:
-    """Tool results can be a string or a list of content blocks; return plain text."""
-    content = message.content
-    if isinstance(content, list):
-        # A list of blocks: each is a dict like {"type": "text", "text": "..."} or a plain value.
-        return "".join(b.get("text", "") if isinstance(b, dict) else str(b) for b in content)
-    return content or ""  # plain string (or empty if None)
-
-
-class ScriptedFakeLLM(BaseChatModel):
-    """Pretends to be a model: search -> check price -> answer. For learning and tests only."""
-
-    def bind_tools(self, tools: Any, **kwargs: Any):
-        # A real model needs to be told which tools exist. Ours follows a fixed
-        # script, so it ignores them and just returns itself.
-        return self
-
-    # `_llm_type` and `_generate` keep their underscores: LangChain requires exactly these names.
-    @property
-    def _llm_type(self) -> str:
-        return "scripted-fake"  # name LangChain shows in logs and traces
-
-    def _generate(self, messages, stop=None, run_manager=None, **kwargs) -> ChatResult:
-        """Called each time the graph's "agent" node asks the model for a reply."""
-        # Count how many tool results are already in the conversation: that
-        # tells us which step of the script we are on.
-        tool_results = [m for m in messages if isinstance(m, ToolMessage)]
-        if len(tool_results) == 0:
-            # Step 1: no tools used yet -> ask to search for "python" books.
-            msg = AIMessage(content="", tool_calls=[
-                {"name": "search_books", "args": {"query": "python"}, "id": "call_1"}])
-        elif len(tool_results) == 1:
-            # Step 2: we have search results -> take the first hit's id and ask for its price.
-            hits = json.loads(message_text(tool_results[0]) or "[]")
-            book_id = hits[0]["id"] if hits else "b1"  # fall back to b1 if nothing found
-            msg = AIMessage(content="", tool_calls=[
-                {"name": "get_price_and_stock", "args": {"book_id": book_id}, "id": "call_2"}])
-        else:
-            # Step 3: we have the price -> write the final answer (no tool call, so the graph ends).
-            info = json.loads(message_text(tool_results[-1]))
-            msg = AIMessage(content=f"Book {info['id']} costs ${info['price_usd']} "
-                                    f"and there are {info['in_stock']} copies in stock.")
-        return ChatResult(generations=[ChatGeneration(message=msg)])
+    """Return the chat model described by the LLM_* variables."""
+    provider = os.environ.get("LLM_PROVIDER", "ollama").strip().lower()
+    model = os.environ.get("LLM_MODEL", "").strip() or DEFAULT_MODELS.get(provider, "")
+    if not model:
+        raise SystemExit(f"LLM_MODEL is not set for provider '{provider}': add it to .env (see .env.example)")
+    # Settings shared by every model; temperature 0 = no randomness, so the same question gives the same answer.
+    options: dict = {"temperature": float(os.environ.get("LLM_TEMPERATURE", "0"))}
+    base_url = os.environ.get("LLM_BASE_URL", "").strip()
+    api_key = os.environ.get("LLM_API_KEY", "").strip()
+    try:
+        if provider in OPENAI_COMPATIBLE:
+            default_url, key_variable = OPENAI_COMPATIBLE[provider]
+            # One OpenAI-style client, pointed at that service's address with that service's key.
+            options["base_url"] = base_url or default_url
+            if not options["base_url"]:
+                raise SystemExit(f"provider '{provider}' needs LLM_BASE_URL in .env")
+            # Local servers need no key, but the client wants some text.
+            options["api_key"] = api_key or os.environ.get(key_variable, "") or "not-needed"
+            return init_chat_model(model, model_provider="openai", **options)
+        if provider == "ollama":
+            # Where the Ollama server listens (its default port is 11434).
+            options["base_url"] = base_url or os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+        elif base_url:
+            options["base_url"] = base_url
+        if api_key:
+            options["api_key"] = api_key
+        return init_chat_model(model, model_provider=LANGCHAIN_NAMES.get(provider, provider), **options)
+    except ImportError as error:
+        # LangChain says which package is missing; add where to put it.
+        raise SystemExit(f"provider '{provider}' needs another package: {error}") from error

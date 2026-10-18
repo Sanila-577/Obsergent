@@ -9,7 +9,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from agenttrace.server.app import create_app
-from agenttrace.storage.sqlite import SCHEMA_V1, SQLiteStorage
+from agenttrace.storage.sqlite import MIGRATIONS, SCHEMA_V1, SQLiteStorage
 from conftest import post_spans
 
 TRACE = "0af7651916cd43dd8448eb211c80319c"
@@ -71,7 +71,8 @@ def test_old_v1_database_is_upgraded_without_losing_data(tmp_path):
     db.execute("PRAGMA user_version = 1")
     db.commit()
     db.close()
-    store = SQLiteStorage(path)  # opening it runs the v1 -> v2 migration
-    assert store.connect().execute("PRAGMA user_version").fetchone()[0] == 2
-    assert [t["trace_id"] for t in store.list_traces()] == ["t1"]  # old data still there
+    store = SQLiteStorage(path)  # opening it runs every later migration (v1 -> latest)
+    assert store.connect().execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
+    old_trace = store.list_traces()[0]
+    assert old_trace["trace_id"] == "t1" and old_trace["models"] is None  # old data still there, new columns empty
     assert store.list_sessions() == [] and store.list_servers() == []  # new tables exist and are empty

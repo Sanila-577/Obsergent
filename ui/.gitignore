@@ -1,0 +1,4 @@
+.e2e/
+test-results/
+playwright-report/
+.shots.mjs

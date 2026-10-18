@@ -47,7 +47,7 @@ The three additions to Example 2's agent:
 ## Run it
 
 From the repository root, with the virtual environment active and the requirements
-installed (`pip install -r requirements.txt`):
+installed (`uv pip install -r requirements.txt`):
 
 ```bash
 cd tutorial/example4_otel_agent

@@ -35,7 +35,7 @@ Safety: keys that look secret (`password`, `token`, `api_key`, `secret`,
 ## Run it
 
 From the repository root, with the virtual environment active and requirements installed
-(`pip install -r requirements.txt`):
+(`uv pip install -r requirements.txt`):
 
 ```bash
 cd tutorial/example5_mcp_proxy

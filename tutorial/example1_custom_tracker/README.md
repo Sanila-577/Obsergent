@@ -16,9 +16,9 @@ AgentTrace's storage idea in about 80 lines.
 From the repository root:
 
 ```bash
-python3 -m venv .venv
+uv venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 
 cd tutorial/example1_custom_tracker
 python app.py

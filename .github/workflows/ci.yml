@@ -1,13 +1,40 @@
 name: ci
 on: [push, pull_request]
 jobs:
-  test:
+  backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      # "examples" brings the MCP SDK: the proxy tests start the real bookshop server.
+      # "examples" brings the MCP SDK (the proxy tests start the real bookshop server); "dev" brings grpcio for the gRPC receiver tests.
       - run: pip install -e ".[dev,langchain,examples]"
       - run: ruff check src tests examples scripts
       - run: pytest -q
+
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: ui/package-lock.json }
+      - run: pip install -e ".[dev,examples]"
+      - run: npm ci
+        working-directory: ui
+      - run: npm run typecheck
+        working-directory: ui
+      - run: npm test
+        working-directory: ui
+      - run: npx playwright install --with-deps chromium
+        working-directory: ui
+      # the browser tests build the UI, load a throw-away test database and start the real server themselves (see playwright.config.ts)
+      - run: npx playwright test
+        working-directory: ui
+        env: { AGENTTRACE_PYTHON: python }
+      - name: the built UI must be inside the wheel
+        run: |
+          pip install build
+          python -m build --wheel
+          unzip -l dist/*.whl | grep "agenttrace/server/static/index.html"

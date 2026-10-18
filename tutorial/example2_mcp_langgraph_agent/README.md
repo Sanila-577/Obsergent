@@ -47,7 +47,7 @@ v2 can't be installed here. `mcp_tracing.py` does by hand what v2 does:
 ## Run it
 
 From the repository root, with the virtual environment active and requirements installed
-(`pip install -r requirements.txt`, with the Example 2 lines uncommented):
+(`uv pip install -r requirements.txt`, with the Example 2 lines uncommented):
 
 ```bash
 cd tutorial/example2_mcp_langgraph_agent

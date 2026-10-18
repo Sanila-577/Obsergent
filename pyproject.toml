@@ -11,6 +11,7 @@ requires-python = ">=3.11"
 license = "MIT"
 dependencies = [
     "fastapi>=0.115",
+    "pyyaml>=6",                                     # config.yaml
     "uvicorn>=0.30",
     "httpx>=0.27",                                   # HTTP proxy (phase 2)
     "opentelemetry-sdk>=1.30",
@@ -21,6 +22,11 @@ dependencies = [
 [project.optional-dependencies]
 # Auto-trace LangChain / LangGraph inside the agent.
 langchain = ["openinference-instrumentation-langchain>=0.1.70"]
+# Receive OTLP over gRPC (needed for WSO2 API Manager's built-in OpenTelemetry exporter).
+grpc = ["grpcio>=1.60"]
+# Model calls made directly through these SDKs (init(instrument=["openai"]) / ["anthropic"]).
+openai = ["openinference-instrumentation-openai>=0.1.60"]
+anthropic = ["openinference-instrumentation-anthropic>=3.0"]
 # Everything the demo agent in examples/bookshop needs (mcp is pinned below 2.0:
 # langchain-mcp-adapters 0.3.x needs MCP SDK v1).
 examples = [
@@ -28,10 +34,16 @@ examples = [
     "langgraph>=1.2",
     "langchain>=1.4",
     "langchain-ollama>=1.1",
+    "langchain-openai>=1.0",
+    "python-dotenv>=1.0",
     "langchain-mcp-adapters>=0.3,<0.4",
     "openinference-instrumentation-langchain>=0.1.70",
 ]
-dev = ["pytest>=8", "pytest-asyncio>=0.24", "httpx>=0.27", "ruff>=0.6"]
+# More language models for the example agent (see .env.example): OpenAI-compatible services (OpenAI, Groq, OpenRouter,
+# Hugging Face, Together, ...) are covered by langchain-openai in `examples`; these two have their own clients.
+llm-anthropic = ["langchain-anthropic>=1.0"]
+llm-google = ["langchain-google-genai>=2.0"]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "httpx>=0.27", "ruff>=0.6", "grpcio>=1.60"]
 
 [project.scripts]
 agenttrace = "agenttrace.cli:main"
@@ -40,12 +52,16 @@ agenttrace = "agenttrace.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/agenttrace"]
 
+# The built web UI (npm run build in ui/) is git-ignored, but it must be inside the wheel.
+[tool.hatch.build]
+artifacts = ["src/agenttrace/server/static/**"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 
 [tool.ruff]
-line-length = 120
+line-length = 130
 src = ["src", "tests"]
 
 [tool.ruff.lint]

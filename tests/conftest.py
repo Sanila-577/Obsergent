@@ -74,3 +74,19 @@ def run_proxy(endpoint: str, server_cmd: list[str], messages: list[dict], name="
 @pytest.fixture
 def bookshop_cmd():
     return [sys.executable, str(BOOKSHOP)]
+
+
+def load_fixture_spans(name: str, shift_to_now: bool = True) -> list:
+    """Spans captured from real runs (tests/fixtures/<name>), moved so the newest one ends 'now'.
+
+    The dashboards look at 'the last 24 hours', so a fixture recorded on some past day would otherwise be empty.
+    """
+    from agenttrace.models import Span
+
+    spans = [Span(**row) for row in json.loads((ROOT / "tests" / "fixtures" / name).read_text())]
+    if shift_to_now:
+        offset = time.time_ns() - max(s.end_ns for s in spans)
+        for span in spans:
+            span.start_ns += offset
+            span.end_ns += offset
+    return spans

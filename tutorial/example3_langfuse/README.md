@@ -61,7 +61,7 @@ Use `LANGFUSE_BASE_URL=http://localhost:3000`.
 ## Step 2: add your keys
 
 From the repository root, with the virtual environment active and the requirements
-installed (`pip install -r requirements.txt`):
+installed (`uv pip install -r requirements.txt`):
 
 ```bash
 cd tutorial/example3_langfuse
