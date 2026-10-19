@@ -68,3 +68,21 @@ def test_a_named_file_that_does_not_exist_is_an_error(monkeypatch, tmp_path):
     config.reload()
     with pytest.raises(FileNotFoundError):
         config.load()
+
+
+def test_pricing_settings_have_defaults_and_the_environment_wins(monkeypatch):
+    assert config.pricing_enabled() and config.pricing_auto_refresh()
+    assert config.pricing_refresh_minutes("openrouter") == 30 and config.pricing_refresh_minutes("litellm") == 120
+    assert config.pricing_exact_from_provider() and config.pricing_credits_per_usd() == 1
+    assert config.pricing_reprice() == "call_time"
+    assert set(config.pricing_sources()) == {"models_dev", "openrouter", "huggingface", "litellm"}
+    assert "ollama" in config.pricing_local_providers() and config.pricing_overrides() == {}
+    monkeypatch.setenv("AGENTTRACE_PRICING_AUTO_REFRESH", "false")
+    monkeypatch.setenv("AGENTTRACE_PRICING_REPRICE", "NOW")
+    monkeypatch.setenv("AGENTTRACE_PRICING", "0")
+    assert not config.pricing_auto_refresh() and config.pricing_reprice() == "now" and not config.pricing_enabled()
+
+
+def test_pricing_overrides_come_from_the_file(monkeypatch, tmp_path):
+    use_file(monkeypatch, tmp_path, "pricing:\n  overrides:\n    my-model: {input_per_million: 0.5, output_per_million: 1.5}\n")
+    assert config.pricing_overrides()["my-model"]["output_per_million"] == 1.5

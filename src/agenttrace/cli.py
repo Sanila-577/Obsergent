@@ -24,19 +24,21 @@ import uvicorn
 # Settings (ports, database path).
 from agenttrace import config
 
+# Builds the HTTP proxy web app.
+from agenttrace.analysis import pricing
+
 # Drift detection used by `agenttrace drift`.
 from agenttrace.analysis.safety import drift_report
-
-# Builds the HTTP proxy web app.
 from agenttrace.proxy.http import create_proxy_app
 
 # The stdio proxy class.
 from agenttrace.proxy.stdio import StdioProxy
 
+# Starts the optional gRPC receiver.
+from agenttrace.server import price_sync
+
 # Builds the AgentTrace server web app.
 from agenttrace.server.app import create_app
-
-# Starts the optional gRPC receiver.
 from agenttrace.server.grpc_receiver import start_grpc_server
 
 # The database.
@@ -78,6 +80,12 @@ def build_parser() -> argparse.ArgumentParser:
     http.add_argument("--insecure", action="store_true",
                       help="do NOT check the upstream's TLS certificate (local development only)")
 
+    # Command `prices`: the price lists (refresh, status, show one model).
+    prices = sub.add_parser("prices", help="model prices: refresh | status | show <model>")
+    prices.add_argument("action", choices=["refresh", "status", "show"])
+    prices.add_argument("model", nargs="?", help="for `show`: a model name, e.g. gpt-4o-mini")
+    prices.add_argument("--provider", help="for `show`: the provider, e.g. openai, groq, openrouter")
+
     # Command `config`: print the settings in use (the Makefile reads ports from here).
     cfg = sub.add_parser("config", help="show the settings (config.yaml + environment), or one value")
     cfg.add_argument("key", nargs="?", help="a dotted key such as server.port; omit to show everything")
@@ -115,6 +123,8 @@ def format_time(ns: int) -> str:
 def cmd_up(args) -> int:
     # Open (and create/upgrade) the database; shared by HTTP and gRPC.
     storage = SQLiteStorage(config.db_path())  # shared by the HTTP API and (optionally) the gRPC receiver
+    # Keep the model prices fresh in the background (the one outbound call; off with pricing.auto_refresh: false).
+    price_sync.start_background_refresh(storage)
     # Tell the user where to open the UI.
     print(f"AgentTrace on http://{config.host()}:{config.port()}  (db: {config.db_path()})")
     # Only if --grpc was given: start the gRPC receiver in background threads.
@@ -155,6 +165,37 @@ def cmd_proxy_http(args) -> int:
     app = create_proxy_app({name: url}, verify=verify)
     # Serve it on localhost.
     uvicorn.run(app, host=config.proxy_host(), port=port, log_level="warning")
+    return 0
+
+
+# `agenttrace prices refresh | status | show <model>`.
+def cmd_prices(args) -> int:
+    store = SQLiteStorage(config.db_path())
+    if args.action == "refresh":
+        # Download every list now and say what each one gave.
+        for source, outcome in price_sync.refresh(store, force=True).items():
+            print(f"{source:<12} {outcome}")
+        return 0
+    if args.action == "status":
+        # When each list was last downloaded and how many models it holds.
+        rows = store.list_sync()
+        if not rows:
+            print("no prices yet: run `agenttrace prices refresh` (or start `agenttrace up`: it downloads them)")
+        for row in rows:
+            print(f"{row['source']:<12} {row['models']:>6} models  checked {format_time(row['checked_ns'])}"
+                  + (f"  ERROR: {row['error']}" if row["error"] else ""))
+        return 0
+    # show: the price that would be used for this model, and how sure we are.
+    if not args.model:
+        sys.exit("usage: agenttrace prices show <model> [--provider P]")
+    rows = store.price_rows(pricing.candidate_names(args.model))
+    price, confidence, spread = pricing.choose_price(rows, args.provider, args.model, None, config.pricing_overrides())
+    if price is None:
+        local = args.provider in config.pricing_local_providers()
+        print(f"no price known for {args.model}" + ("  (local provider: $0)" if local else ""))
+        return 1
+    print(f"{price.provider}/{price.model} from {price.source}: ${price.input} in, ${price.output} out per million tokens"
+          f"  [{confidence}]" + (f"  lists disagree: totals ${spread[0]} to ${spread[1]}" if spread else ""))
     return 0
 
 
@@ -264,7 +305,7 @@ def cmd_drift(args) -> int:
 
 # Command name -> function that runs it.
 COMMANDS = {"up": cmd_up, "proxy": cmd_proxy, "proxy-http": cmd_proxy_http, "traces": cmd_traces,
-            "config": cmd_config, "show": cmd_show, "sessions": cmd_sessions, "drift": cmd_drift}
+            "config": cmd_config, "prices": cmd_prices, "show": cmd_show, "sessions": cmd_sessions, "drift": cmd_drift}
 
 
 # The entry point: `agenttrace` on the command line calls this (see pyproject.toml).

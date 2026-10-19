@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useMemo, useState } from "react";
 import type { Span } from "../api/types";
 import { formatMs, formatTime } from "../lib/format";
+import { useSettings } from "../lib/state";
 import { buildTree, findNode, layerOf, phasesBelow, reproduceCall } from "../lib/trace";
 import { JsonView } from "./JsonView";
 import { Card, CopyButton, DecisionBadge, LayerBadge, StackBar, Tabs } from "./ui";
@@ -18,6 +19,7 @@ const SHOWN_IN_OVERVIEW: [string, string][] = [
 ];
 
 export function SpanInspector({ span, allSpans, runStart }: { span: Span; allSpans: Span[]; runStart: number }) {
+  const { detailed } = useSettings();
   const [tab, setTab] = useState<Tab>("overview");
   const layer = layerOf(span);
   const attrs = span.attributes;
@@ -31,8 +33,8 @@ export function SpanInspector({ span, allSpans, runStart }: { span: Span; allSpa
   const args = attrs["mcp.tool.arguments"] ?? attrs["input.value"];
   const result = attrs["mcp.result"] ?? attrs["mcp.tools"] ?? attrs["output.value"];
 
-  const tabs: { id: Tab; label: string }[] = [{ id: "overview", label: "Overview" }, { id: "arguments", label: "Input" }, { id: "result", label: "Output" },
-    ...(hasGateway ? [{ id: "gateway" as Tab, label: "Gateway" }] : []), { id: "raw", label: "Raw" }];
+  const tabs: { id: Tab; label: string }[] = [{ id: "overview", label: "Summary" }, { id: "arguments", label: "Input" }, { id: "result", label: "Output" },
+    ...(hasGateway ? [{ id: "gateway" as Tab, label: "Gateway" }] : []), ...(detailed ? [{ id: "raw" as Tab, label: "Raw" }] : [])];
   const active = tabs.some((t) => t.id === tab) ? tab : "overview";
 
   return (
@@ -41,16 +43,16 @@ export function SpanInspector({ span, allSpans, runStart }: { span: Span; allSpa
       {active === "overview" && (
         <div className="col">
           <dl className="kv">
-            <dt>Duration</dt><dd>{formatMs(span.duration_ms)}</dd>
+            <dt>Took</dt><dd>{formatMs(span.duration_ms)}</dd>
             <dt>Started</dt><dd>{formatTime(span.start_ns)} <span className="muted">(+{formatMs((span.start_ns - runStart) / 1e6)})</span></dd>
-            <dt>Service</dt><dd>{span.service}</dd>
-            <dt>Status</dt><dd>{span.status_code === "ERROR" ? <span className="badge error">ERROR</span> : span.status_code}{span.status_message && <span className="muted"> {span.status_message}</span>}</dd>
+            {detailed && <><dt>Program</dt><dd>{span.service}</dd></>}
+            <dt>Result</dt><dd>{span.status_code === "ERROR" ? <span className="badge error">problem</span> : span.status_code === "OK" ? "worked" : "no problem reported"}{span.status_message && <span className="muted"> {span.status_message}</span>}</dd>
             {SHOWN_IN_OVERVIEW.filter(([key]) => attrs[key] !== undefined).map(([key, label]) => (
               <><dt key={`${key}-k`}>{label}</dt><dd key={`${key}-v`}>{key === "gateway.decision" ? <DecisionBadge decision={String(attrs[key])} /> : String(attrs[key])}</dd></>
             ))}
-            <dt>Span id</dt><dd className="mono">{span.span_id}</dd>
+            {detailed && <><dt>Step id</dt><dd className="mono">{span.span_id}</dd></>}
           </dl>
-          {reproduction && (
+          {reproduction && detailed && (
             <div className="row wrap">
               <CopyButton text={reproduction.jsonRpc} label="Copy as JSON-RPC" />
               <CopyButton text={reproduction.curl} label="Copy as curl" />
@@ -63,22 +65,22 @@ export function SpanInspector({ span, allSpans, runStart }: { span: Span; allSpa
       {active === "gateway" && (
         <div className="col">
           <dl className="kv">
-            <dt>Decision</dt><dd><DecisionBadge decision={String(attrs["gateway.decision"] ?? "")} /></dd>
-            <dt>HTTP status</dt><dd>{String(attrs["http.response.status_code"] ?? attrs["gateway.status"] ?? "-")}</dd>
+            <dt>Gateway result</dt><dd><DecisionBadge decision={String(attrs["gateway.decision"] ?? "")} /></dd>
+            <dt>Web status</dt><dd>{String(attrs["http.response.status_code"] ?? attrs["gateway.status"] ?? "-")}</dd>
             <dt>API</dt><dd>{String(attrs["gateway.api"] ?? "-")}</dd>
-            <dt>Activity id</dt><dd className="mono">{String(attrs["gateway.activity_id"] ?? "-")}</dd>
+            {detailed && <><dt>Gateway call id</dt><dd className="mono">{String(attrs["gateway.activity_id"] ?? "-")}</dd></>}
           </dl>
           {Object.keys(phases).length > 0 && (
             <div className="col" style={{ gap: 6 }}>
-              <h3>Time inside the gateway</h3>
+              <h3>Where the gateway spent its time</h3>
               <StackBar parts={phases} />
               <table><tbody>{Object.entries(phases).map(([name, ms]) => <tr key={name}><td>{name.replaceAll("_", " ")}</td><td className="num">{formatMs(ms)}</td></tr>)}</tbody></table>
             </div>
           )}
-          <Link to="/gateway">Open the Gateway page →</Link>
+          <Link to="/gateway">Open the Gateway guard page →</Link>
         </div>
       )}
-      {active === "raw" && (
+      {active === "raw" && detailed && (
         <div className="col">
           <div><CopyButton text={JSON.stringify(span, null, 2)} label="Copy span JSON" /></div>
           <JsonView value={{ attributes: attrs, events: span.events, parent: span.parent_span_id, trace: span.trace_id }} />

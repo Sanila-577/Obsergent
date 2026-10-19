@@ -17,6 +17,7 @@ from pathlib import Path
 from agenttrace import config
 from agenttrace.ingest.pipeline import ingest_spans
 from agenttrace.models import Span
+from agenttrace.server import price_sync
 from agenttrace.storage.sqlite import SQLiteStorage
 
 FIXTURES = Path(__file__).resolve().parent.parent.parent / "tests" / "fixtures"
@@ -66,6 +67,39 @@ def loop_run(when_ns: int, rng: random.Random) -> list[Span]:
     return spans
 
 
+def hosted(spans: list[Span], provider: str, model: str, scale: float) -> list[Span]:
+    """The same agent run, as if a hosted model had answered (more or fewer tokens): so there is something to price."""
+    for span in spans:
+        if span.attributes.get("openinference.span.kind") == "LLM":
+            span.attributes["llm.provider"], span.attributes["llm.model_name"] = provider, model
+            for key in ("prompt", "completion", "total"):
+                name = f"llm.token_count.{key}"
+                if name in span.attributes:
+                    span.attributes[name] = int(span.attributes[name] * scale)
+    return spans
+
+
+def routed(spans: list[Span]) -> list[Span]:
+    """The same run, as if OpenRouter had answered: its response carries the cost it charged (usage.cost)."""
+    for span in spans:
+        if span.attributes.get("openinference.span.kind") == "LLM":
+            span.attributes["llm.provider"], span.attributes["llm.model_name"] = "openai", "openai/gpt-4o-mini"
+            usage = {"prompt_tokens": 300, "completion_tokens": 30, "total_tokens": 330, "cost": 0.0123, "is_byok": False,
+                     "cost_details": {"upstream_inference_cost": None}}
+            span.attributes["output.value"] = json.dumps({"generations": [[{"message": {"kwargs": {"response_metadata": {}}}}]],
+                                                          "llm_output": {"token_usage": usage}})
+    return spans
+
+
+def seed_prices(store: SQLiteStorage, now: int) -> None:
+    """The prices price_sync would have downloaded (trimmed real lists from tests/fixtures/prices)."""
+    folder = Path(__file__).resolve().parent.parent.parent / "tests" / "fixtures" / "prices"
+    for source in price_sync.SOURCES:
+        rows = price_sync.PARSERS[source](json.loads((folder / f"{source}.json").read_text()))
+        store.save_prices(source, rows, now - 90 * MINUTE)
+        store.save_sync(source, "", now - 90 * MINUTE, now - 5 * MINUTE, 1)
+
+
 def tool(name: str, description: str, schema: dict | None = None) -> dict:
     return {"name": name, "description": description, "inputSchema": schema or {"type": "object", "properties": {}}}
 
@@ -81,6 +115,12 @@ def main() -> None:
 
     for i in range(24):  # agent runs over the last ~4 hours
         ingest_spans(clone(agent_run, now - (i * 9 + rng.randint(1, 6)) * MINUTE, rng), store)
+    seed_prices(store, now)
+    for i in range(8):  # runs answered by hosted models, which cost money
+        provider, model = (("openai", "gpt-4o-mini"), ("anthropic", "claude-sonnet-4-5"))[i % 2]
+        ingest_spans(hosted(clone(agent_run, now - (i * 17 + rng.randint(1, 8)) * MINUTE, rng), provider, model, 40), store)
+    for i in range(3):  # runs whose provider reported the exact cost (OpenRouter)
+        ingest_spans(routed(clone(agent_run, now - (i * 23 + rng.randint(1, 8)) * MINUTE, rng)), store)
     for i in range(14):  # calls through the gateway: allowed ones mixed with refused ones
         for trace in sorted(gateway_by_trace.values(), key=lambda s: -len(s)):
             if len(trace) < 8 and rng.random() < 0.55:

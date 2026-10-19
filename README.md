@@ -79,9 +79,10 @@ cd examples/bookshop
 python agent.py "Do you have a Python book in stock, and how much is it?"
 ```
 
-Refresh the browser: a new run appears under **Runs**. Open it. **Timeline** shows every step (blue = agent, teal = model,
-purple = proxy); click a `tools/call` row to see the arguments and result and to copy the call as `curl`. **Conversation**
-shows the chat, and each tool call links to the real MCP call. The same data is in the terminal:
+Refresh the browser: a new conversation appears under **Conversations**. Open it: **What this conversation cost** shows the
+price of each model call, **Step by step** shows every step (blue = agent, teal = model, purple = proxy; switch to **Detailed**
+to copy a call as `curl`), and **Chat** shows the conversation with each action linked to the real tool call. The same data is
+in the terminal:
 
 ```bash
 make traces                                 # list the runs
@@ -226,7 +227,7 @@ docker compose down                           # [gateway repo] stops the gateway
 make reset-db                                 # EMPTIES AgentTrace's database; `agenttrace up` must be stopped first
 ```
 
-Open **http://127.0.0.1:7318**: **Runs** and **Gateway** show the calls and the gateway's decisions. To point your own
+Open **http://127.0.0.1:7318**: **Conversations** and **Gateway guard** show the calls and the gateway's decisions. To point your own
 agent at it, use `http://127.0.0.1:7319/mcp/wso2` (its `Authorization` header is forwarded and never stored).
 
 ---
@@ -235,37 +236,64 @@ agent at it, use `http://127.0.0.1:7319/mcp/wso2` (its `Authorization` header is
 
 Served by `agenttrace up` at `http://127.0.0.1:7318` (built from [ui/](ui/): React, TypeScript, Vite).
 
-| Page                      | What it is for                                                                                                                                                                                                                                                                                  |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Overview**        | numbers, an activity chart, busiest and slowest tools, latest runs, models used                                                                                                                                                                                                                 |
-| **Runs**            | every run with filters (text inside arguments and results, tool, server, model, gateway decision, errors, time); tick two runs to compare                                                                                                                                                       |
-| **Run detail**      | a**timeline** (waterfall coloured by agent / model / proxy / gateway, slowest path outlined, search, collapse), an **inspector** (input, output, gateway tab, raw, copy as JSON-RPC or curl), the **conversation** with tool calls linked to MCP calls, model calls, findings |
-| **Sessions**        | what one app did with one MCP server, as a timeline                                                                                                                                                                                                                                             |
-| **Servers & tools** | per-tool calls, errors, median and p95, version history of a server's tool list with a**word-level diff**, gateway-vs-upstream comparison                                                                                                                                                 |
-| **Findings**        | drift, risky tools, injection-like text, loops, slow tools, refused gateway calls; dismiss and restore                                                                                                                                                                                          |
-| **Gateway**         | WSO2 decisions, time inside the gateway, calls, per-tool and per-caller breakdowns, access-control assistant                                                                                                                                                                                    |
-| **Map**             | who calls which server and tool, with counts and failures; click to filter runs                                                                                                                                                                                                                 |
-| **Compare**         | two runs side by side with the first difference marked                                                                                                                                                                                                                                          |
+**Simple and Detailed.** The switch in the top bar changes how much you see. **Simple** (the default) uses plain words and
+hides ids, raw data and protocol terms; **Detailed** shows everything (ids, raw JSON, services, copy-as-curl). Every empty
+page shows a three-step guide with a "waiting for data" light that turns into the data when it arrives, and the (?) bubbles
+explain words such as "tokens". Charts and tiles are clickable filters.
+
+| Page (Simple name)             | What it is for                                                                                                                                                                       |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Overview**             | the numbers, what you spent, an activity chart, most used and slowest actions, latest conversations, models used                                                                     |
+| **Conversations** (runs) | every conversation, titled with the question asked, with its cost, filters (text, action, model, gateway result, problems, time) and compare-two                                     |
+| **A conversation**       | "What this conversation cost" (a bar you can click), step by step (a timeline), the chat with each action linked to the real tool call, model calls with their cost, things to check |
+| **App activity**         | what one app such as Claude Desktop did with one tool server, in order                                                                                                               |
+| **Tools**                | each action's use, problems and speed, and whether a tool server changed (word-by-word differences), gateway-vs-upstream comparison                                                  |
+| **Spending**             | a headline sentence, a clickable chart of cost over time by model, "Where did the money go?" by model, action or conversation, and when prices were last checked                     |
+| **Things to check**      | changed tools, risky tools, text that gives the model orders, loops, failures, blocked gateway requests; dismiss and restore                                                         |
+| **Gateway guard**        | what the WSO2 gateway allowed or blocked, where it spent its time, who asked, and which tools should be allowed                                                                      |
+| **Connections**          | who talks to which tool server and tool, with counts and failures; click to open its conversations                                                                                   |
+| **Compare**              | two conversations side by side with the first difference marked                                                                                                                      |
 
 Shortcuts: `⌘K` / `Ctrl+K` search · `g` then `o r s t f w m` go to a page · `j` / `k` move through a timeline · `/` search
-inside a run. Also: live tail (refresh every 2 s), 1 h / 6 h / 24 h / 7 d window, dark and light theme.
+inside a conversation. Also: live updates (refresh every 2 s), 1 h / 6 h / 24 h / 7 d period, dark and light theme.
+
+## Cost of model calls
+
+AgentTrace shows what each model call, conversation and model cost, in two kinds:
+
+* **Exact.** OpenRouter and xAI send the amount they charged with every response. AgentTrace reads it from the recorded response
+  and shows it with an **exact** tag. (Other providers, such as OpenAI, Anthropic and Groq, send only word counts, so no exact cost exists.)
+* **Estimated.** Word counts (tokens) times the model's price. Prices are downloaded by AgentTrace itself from public price
+  lists (models.dev, OpenRouter, Hugging Face, LiteLLM) and compared with each other; nothing is typed in by hand. The formula
+  covers cached input, reasoning, audio, long prompts, batch/flex/priority tiers, one-hour cache writes, web searches and
+  US-only inference (details in [docs/costs.md](docs/costs.md)).
+
+Models on your own computer (Ollama, LM Studio) are free; a model with no known price shows "no price" and is left out of totals.
+Costs are calculated each time they are shown, with the price that was valid when the call was made (`pricing.reprice: now` uses
+today's). **When prices update:** the live lists (OpenRouter, Hugging Face) every 30 minutes, the community lists (models.dev,
+LiteLLM) every 2 hours, while AgentTrace runs, plus when you press **Check now** or run `make prices`. The Spending page says when
+prices were last checked and when one changed.
+
+**The one outbound call.** To get prices, AgentTrace downloads those public files (plain GET requests; nothing about your
+data is sent). Turn it off with `pricing.auto_refresh: false` in `config.yaml`, or all costs with `pricing.enabled: false`.
 
 ## 6. AgentTrace vs Langfuse
 
 They overlap (both store traces) but aim at different things; the same OpenTelemetry data can feed both. AgentTrace does
 **not** replace Langfuse.
 
-|                                          | Langfuse                                                                    | AgentTrace                                                                                                           |
-| ---------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Main subject                             | LLM generations and traces: prompts, completions, cost                      | MCP tool calls and the traffic between client, gateway and server                                                    |
-| Recording MCP                            | needs instrumentation in both client and server                             | a**proxy** records it with no code change (Claude Desktop, Cursor, any language)                               |
-| Calls inside your agent                  | yes: generations, tokens, cost, prompts, scores                             | yes: model calls, tokens, conversation, and each tool call**linked to the real MCP call and gateway decision** |
-| Apps you can't modify                    | not applicable                                                              | **sessions** group everything such an app did                                                                  |
-| Tool-description tampering               | not a feature                                                               | **drift detection**, plus gateway-vs-upstream comparison                                                       |
-| API gateway view                         | none                                                                        | **WSO2 gateway**: decisions, refused calls, time inside the gateway, access-policy suggestions                 |
-| Security findings, agent smells          | not its focus / build your own                                              | built in                                                                                                             |
-| Setup                                    | several services (or the cloud)                                             | `pip install` + one process + one SQLite file, localhost only                                                      |
-| **Not in AgentTrace (on purpose)** | prompt management, evaluations, datasets, scores, accounts, cost dashboards |                                                                                                                      |
+|                                          | Langfuse                                                   | AgentTrace                                                                                                           |
+| ---------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Main subject                             | LLM generations and traces: prompts, completions, cost     | MCP tool calls and the traffic between client, gateway and server                                                    |
+| Recording MCP                            | needs instrumentation in both client and server            | a**proxy** records it with no code change (Claude Desktop, Cursor, any language)                               |
+| Calls inside your agent                  | yes: generations, tokens, cost, prompts, scores            | yes: model calls, tokens, conversation, and each tool call**linked to the real MCP call and gateway decision** |
+| Apps you can't modify                    | not applicable                                             | **sessions** group everything such an app did                                                                  |
+| Tool-description tampering               | not a feature                                              | **drift detection**, plus gateway-vs-upstream comparison                                                       |
+| API gateway view                         | none                                                       | **WSO2 gateway**: decisions, refused calls, time inside the gateway, access-policy suggestions                 |
+| Security findings, agent smells          | not its focus / build your own                             | built in                                                                                                             |
+| Setup                                    | several services (or the cloud)                            | `pip install` + one process + one SQLite file, localhost only                                                      |
+| **Cost**                           | cost dashboards                                            | an estimate per call, conversation and model, from prices that update themselves                                     |
+| **Not in AgentTrace (on purpose)** | prompt management, evaluations, datasets, scores, accounts |                                                                                                                      |
 
 ---
 
@@ -333,6 +361,7 @@ Attribute names follow OpenTelemetry (`mcp.method.name`, `gen_ai.tool.name`...).
 | `GET /api/servers` · `/{name}/snapshots` · `/{name}/diff` · `/compare?a=&b=`                    | tool lists, drift, version diff, server vs server                                                          |
 | `GET /api/findings` · `POST                                                                             | DELETE /api/findings/{id}/ack`                                                                             |
 | `GET /api/gateway/summary` · `/api/gateway/calls/{activity_id}` · `/api/policy/suggestion?server=` | the gateway view, one call, the policy suggestion                                                          |
+| `GET /api/spending` · `/api/prices` · `POST /api/prices/refresh`                                   | cost by model, tool and over time; the price lists' status; check prices now                               |
 | `GET /health`                                                                                            | liveness                                                                                                   |
 
 `agenttrace proxy-http` (port `proxy.port`, default 7319) serves `POST|GET|DELETE /mcp/{name}`.
@@ -346,6 +375,7 @@ Attribute names follow OpenTelemetry (`mcp.method.name`, `gen_ai.tool.name`...).
 | `agenttrace proxy-http [--name X] [--url URL] [--port N] [--ca-bundle FILE \| --insecure]` | record a remote Streamable-HTTP server or a gateway (defaults from`config.yaml`) |
 | `agenttrace traces [--limit N] [--session ID]` · `show <id>`                           | list runs · print one as a tree                                                   |
 | `agenttrace sessions` · `drift [server]`                                               | proxy sessions · tools whose description changed                                  |
+| `agenttrace prices refresh \| status \| show <model>`                                       | download the price lists · when they were checked · the price used for a model   |
 | `agenttrace config [key]`                                                                 | show the settings in use (or one, e.g.`server.port`)                             |
 
 `traces`, `show`, `sessions` and `drift` read the SQLite file directly, so they work without the server.
@@ -359,19 +389,28 @@ it, so a value is changed in one place. Precedence: an environment variable, the
 (AgentTrace also works with no config file). `agenttrace config` prints what is in use; `AGENTTRACE_CONFIG=/path/x.yaml`
 uses another file.
 
-| `config.yaml` key                            | Default                                     | Environment override                      | Meaning                                                              |
-| ---------------------------------------------- | ------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------- |
-| `server.host` / `server.port`              | `127.0.0.1` / `7318`                    | `AGENTTRACE_HOST` / `AGENTTRACE_PORT` | where`agenttrace up` listens (UI, REST API, OTLP/HTTP)             |
-| `server.grpc_port`                           | `4317`                                    | `AGENTTRACE_GRPC_PORT`                  | the OTLP/gRPC receiver (`up --grpc`)                               |
-| `server.endpoint`                            | empty =`http://<host>:<port>`             | `AGENTTRACE_ENDPOINT`                   | where the SDK and proxies send spans                                 |
-| `storage.path`                               | `~/.agenttrace/agenttrace.db`             | `AGENTTRACE_DB`                         | the SQLite file                                                      |
-| `recording.max_attr_chars`                   | `4000`                                    | `AGENTTRACE_MAX_ATTR_CHARS`             | longest value kept in one span attribute                             |
-| `proxy.host` / `proxy.port`                | `127.0.0.1` / `7319`                    | `AGENTTRACE_PROXY_PORT`                 | `agenttrace proxy-http`                                            |
-| `gateway.router`                             | `http://localhost:8080`                   | `GATEWAY_ROUTER`                        | where MCP traffic enters the WSO2 gateway                            |
-| `gateway.controller`                         | `http://localhost:9090/api/management/v1` | `GATEWAY_CONTROLLER`                    | the gateway's management API (`make register`)                     |
-| `gateway.username`                           | `admin`                                   | `WSO2AP_GW_USERNAME`                    | gateway admin user                                                   |
-| `gateway.mcp_name` / `gateway.mcp_context` | `wso2` / `/bookshop`                    |                                           | the proxy's name in AgentTrace, the MCP server's path in the gateway |
-| `bookshop.http_port`                         | `9100`                                    | `BOOKSHOP_PORT`                         | the example MCP server over HTTP                                     |
+| `config.yaml` key                            | Default                                     | Environment override                      | Meaning                                                                         |
+| ---------------------------------------------- | ------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------- |
+| `server.host` / `server.port`              | `127.0.0.1` / `7318`                    | `AGENTTRACE_HOST` / `AGENTTRACE_PORT` | where`agenttrace up` listens (UI, REST API, OTLP/HTTP)                        |
+| `server.grpc_port`                           | `4317`                                    | `AGENTTRACE_GRPC_PORT`                  | the OTLP/gRPC receiver (`up --grpc`)                                          |
+| `server.endpoint`                            | empty =`http://<host>:<port>`             | `AGENTTRACE_ENDPOINT`                   | where the SDK and proxies send spans                                            |
+| `storage.path`                               | `~/.agenttrace/agenttrace.db`             | `AGENTTRACE_DB`                         | the SQLite file                                                                 |
+| `recording.max_attr_chars`                   | `4000`                                    | `AGENTTRACE_MAX_ATTR_CHARS`             | longest value kept in one span attribute                                        |
+| `proxy.host` / `proxy.port`                | `127.0.0.1` / `7319`                    | `AGENTTRACE_PROXY_PORT`                 | `agenttrace proxy-http`                                                       |
+| `gateway.router`                             | `http://localhost:8080`                   | `GATEWAY_ROUTER`                        | where MCP traffic enters the WSO2 gateway                                       |
+| `gateway.controller`                         | `http://localhost:9090/api/management/v1` | `GATEWAY_CONTROLLER`                    | the gateway's management API (`make register`)                                |
+| `gateway.username`                           | `admin`                                   | `WSO2AP_GW_USERNAME`                    | gateway admin user                                                              |
+| `gateway.mcp_name` / `gateway.mcp_context` | `wso2` / `/bookshop`                    |                                           | the proxy's name in AgentTrace, the MCP server's path in the gateway            |
+| `bookshop.http_port`                         | `9100`                                    | `BOOKSHOP_PORT`                         | the example MCP server over HTTP                                                |
+| `pricing.enabled`                            | `true`                                    | `AGENTTRACE_PRICING`                    | calculate costs at all                                                          |
+| `pricing.auto_refresh`                       | `true`                                    | `AGENTTRACE_PRICING_AUTO_REFRESH`       | download prices automatically (the one outbound call)                           |
+| `pricing.refresh_minutes` | `openrouter 30, huggingface 30, models_dev 120, litellm 120` | | how often each price list is checked (a check that finds nothing new is a few hundred bytes) |
+| `pricing.exact_from_provider` | `true` | `AGENTTRACE_PRICING_EXACT` | use the cost OpenRouter and xAI send with every response instead of an estimate |
+| `pricing.credits_per_usd` | `1` | | OpenRouter reports credits; credits per US dollar |
+| `pricing.reprice`                            | `call_time`                               | `AGENTTRACE_PRICING_REPRICE`            | `call_time` = the price valid when the call was made, `now` = today's price |
+| `pricing.sources`                            | four public lists                           |                                           | where prices are downloaded from                                                |
+| `pricing.local_providers`                    | `[ollama, lmstudio, llamacpp, vllm]`      |                                           | run on your machine: cost $0                                                    |
+| `pricing.overrides`                          | `{}`                                      |                                           | optional prices typed by hand (normally empty)                                  |
 
 Secrets are never in `config.yaml`: the gateway password is the environment variable `WSO2AP_GW_PASSWORD`, and the language
 model's settings and API keys are in `.env` (copied from `.env.example`, git-ignored; section 1, Step 2). The UI's dev server
@@ -393,8 +432,8 @@ src/agenttrace/
   proxy/      recorder.py  stdio.py  http.py  gateway.py  identity.py  sessions.py  redact.py
   ingest/     otlp.py  gateway.py  pipeline.py
   storage/    base.py  sqlite.py
-  analysis/   smells diff safety generations findings toolsdiff policy gateway_view stats
-  server/     app.py  grpc_receiver.py  static/        (static/ = the built web UI)
+  analysis/   smells diff safety generations findings toolsdiff policy gateway_view stats pricing
+  server/     app.py  grpc_receiver.py  price_sync.py  costing.py  static/   (static/ = the built web UI)
   sdk/        setup.py
 ui/           React app: src/pages, src/components, src/lib, src/api; e2e/ (Playwright)
 examples/bookshop/   example agent (llm.py picks the model from .env), stdio server, HTTP server
@@ -424,7 +463,7 @@ real local model and is skipped when Ollama is not running. Speed: `python scrip
 
 * **MCP SDK pinned below 2.0.** `langchain-mcp-adapters` needs SDK v1, which has no tracing; the SDK adds the trace context itself.
 * **External apps:** you see every MCP call, but not the app's own model conversation, which never leaves the app.
-* **Local-first:** binds to `127.0.0.1`, no accounts, no calls except to your own AgentTrace server. The UI has no login.
+* **Local-first:** binds to `127.0.0.1`, no accounts, no calls except to your own AgentTrace server and, to look up model prices, a download of public price lists (switch off with `pricing.auto_refresh: false`). The UI has no login.
 * **WSO2:** verified on the API Platform gateway 1.2.1 (allowed and `denied` calls, joined traces) and earlier on APIM 4.7.0.
   401/403 and 429 from this gateway are classified from the status code but not yet observed ([details](docs/wso2-findings.md)).
 * **Not built yet:** replay/fork of a run, policy/blocking mode, `agenttrace test`, server mode.

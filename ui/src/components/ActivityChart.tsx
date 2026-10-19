@@ -10,15 +10,15 @@ export function ActivityChart({ data, hours }: { data: Overview["activity"]; hou
     return { label, ok: bucket.calls - bucket.errors, errors: bucket.errors };
   });
   return (
-    <div style={{ height: 210 }} role="img" aria-label="Tool calls over time">
+    <div style={{ height: 210 }} role="img" aria-label="Actions over time">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={rows} margin={{ top: 6, right: 8, left: -18, bottom: 0 }}>
           <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="label" stroke="var(--muted)" fontSize={11} tickLine={false} minTickGap={24} />
           <YAxis stroke="var(--muted)" fontSize={11} allowDecimals={false} tickLine={false} axisLine={false} />
           <Tooltip contentStyle={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)" }} />
-          <Area type="monotone" dataKey="ok" name="successful calls" stackId="1" stroke="var(--accent)" fill="var(--accent)" fillOpacity={0.25} isAnimationActive={false} />
-          <Area type="monotone" dataKey="errors" name="failed calls" stackId="1" stroke="var(--bad)" fill="var(--bad)" fillOpacity={0.5} isAnimationActive={false} />
+          <Area type="monotone" dataKey="ok" name="worked" stackId="1" stroke="var(--accent)" fill="var(--accent)" fillOpacity={0.25} isAnimationActive={false} />
+          <Area type="monotone" dataKey="errors" name="had a problem" stackId="1" stroke="var(--bad)" fill="var(--bad)" fillOpacity={0.5} isAnimationActive={false} />
         </AreaChart>
       </ResponsiveContainer>
     </div>

@@ -1,5 +1,6 @@
 // What AgentTrace is, how it differs from Langfuse, and the keyboard shortcuts.
 import { Card, PageHead } from "../components/ui";
+import { PAGES } from "../lib/words";
 
 const ROWS: [string, string, string][] = [
   ["Main subject", "LLM generations and traces: prompts, completions, cost", "MCP tool calls and the traffic between client, gateway and server"],
@@ -11,13 +12,14 @@ const ROWS: [string, string, string][] = [
   ["Security findings", "Not its focus", "Drift, risky tools, injection-like text, refused calls"],
   ["Agent smells", "Build your own dashboards", "Built in: loops, ignored tool errors, slow tools"],
   ["Setup", "Self-hosting needs several services, or use the cloud", "pip install + one process + one SQLite file, localhost only"],
-  ["Not in AgentTrace (on purpose)", "-", "Prompt management, evaluations, datasets, scores, user and team accounts, cost dashboards"],
+  ["Cost", "Yes: model costs, dashboards", "Yes: an estimate per call, conversation and model, from prices that are looked up automatically (see Spending)"],
+  ["Not in AgentTrace (on purpose)", "-", "Prompt management, evaluations, datasets, scores, user and team accounts"],
 ];
 
 export function About() {
   return (
     <>
-      <PageHead title="About AgentTrace" sub="a developer-time debugger for MCP agents" />
+      <PageHead title={PAGES.about.title} about="AgentTrace records what your AI agents and apps do, shows it, and warns about problems." />
       <div className="col" style={{ maxWidth: 1000 }}>
         <Card title="AgentTrace vs Langfuse">
           <p className="muted" style={{ marginTop: 0 }}>They overlap (both store traces) but aim at different things. The same OpenTelemetry data can feed both.</p>
@@ -27,9 +29,9 @@ export function About() {
         <Card title="Keyboard shortcuts">
           <dl className="kv" style={{ gridTemplateColumns: "160px 1fr" }}>
             <dt><kbd>⌘</kbd> <kbd>K</kbd></dt><dd>Search pages, runs, tools and servers</dd>
-            <dt><kbd>g</kbd> then <kbd>o r s t f w m</kbd></dt><dd>Go to Overview, Runs, Sessions, Servers, Findings, Gateway, Map</dd>
-            <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>Next / previous span in a run's timeline</dd>
-            <dt><kbd>/</kbd></dt><dd>Search inside a run</dd>
+            <dt><kbd>g</kbd> then <kbd>o r s t f w m</kbd></dt><dd>Go to Overview, Conversations, App activity, Tools, Things to check, Gateway guard, Connections</dd>
+            <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>Next / previous step in a conversation</dd>
+            <dt><kbd>/</kbd></dt><dd>Search inside a conversation</dd>
           </dl>
         </Card>
       </div>

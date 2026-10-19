@@ -50,8 +50,7 @@ Use **absolute paths**: the app does not see your shell's `PATH` or virtual envi
 }
 ```
 
-The pattern is always: `command` = the `agenttrace` program, `args` = `proxy --name <a label> -- <the real server's
-command and arguments>`. If the file already has other settings, keep them: `"mcpServers"` is just one more key, and
+The pattern is always: `command` = the `agenttrace` program, `args` = `proxy --name <a label> -- <the real server's command and arguments>`. If the file already has other settings, keep them: `"mcpServers"` is just one more key, and
 **mind the commas** (a missing comma makes the whole file invalid and the app ignores it).
 
 To find your paths: `echo "$(pwd)/.venv/bin/agenttrace"` from the repository root.
@@ -89,13 +88,13 @@ The same in the terminal: `agenttrace sessions`, `agenttrace traces`, `agenttrac
 
 ## If it does not work
 
-| Symptom | What to check |
-|---|---|
-| `bookshop` is not listed, or shows an error in Settings → Developer | The config JSON must be valid (commas!). Run the exact `command` + `args` in a terminal: it should wait silently (it is waiting for a client). Fix any path error. |
-| `bookshop` runs but nothing appears in AgentTrace | Was `agenttrace up` running **before** you used Claude (step 1)? Same database and port? The proxy reads the repository's `config.yaml` (`server.port`, `storage.path`); if you moved the repository or use another config, add `"env": {"AGENTTRACE_CONFIG": "/abs/path/config.yaml"}` (or `"AGENTTRACE_ENDPOINT": "http://127.0.0.1:PORT"`) to the entry. |
-| It stopped working after you restarted `agenttrace up` | The proxy keeps running inside Claude Desktop, so recording resumes by itself; if the server was down during a call, that call was not recorded. |
-| `bookshop` shows as disconnected | Something stopped the proxy process (for example `pkill -f agenttrace`). Quit and reopen Claude Desktop. |
-| Claude says it cannot find the tool | Quit and reopen Claude Desktop after every config change. |
+| Symptom                                                                | What to check                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bookshop` is not listed, or shows an error in Settings → Developer | The config JSON must be valid (commas!). Run the exact `command` + `args` in a terminal: it should wait silently (it is waiting for a client). Fix any path error.                                                                                                                                                                                                        |
+| `bookshop` runs but nothing appears in AgentTrace                    | Was `agenttrace up` running **before** you used Claude (step 1)? Same database and port? The proxy reads the repository's `config.yaml` (`server.port`, `storage.path`); if you moved the repository or use another config, add `"env": {"AGENTTRACE_CONFIG": "/abs/path/config.yaml"}` (or `"AGENTTRACE_ENDPOINT": "http://127.0.0.1:PORT"`) to the entry. |
+| It stopped working after you restarted `agenttrace up`               | The proxy keeps running inside Claude Desktop, so recording resumes by itself; if the server was down during a call, that call was not recorded.                                                                                                                                                                                                                              |
+| `bookshop` shows as disconnected                                     | Something stopped the proxy process (for example `pkill -f agenttrace`). Quit and reopen Claude Desktop.                                                                                                                                                                                                                                                                    |
+| Claude says it cannot find the tool                                    | Quit and reopen Claude Desktop after every config change.                                                                                                                                                                                                                                                                                                                     |
 
 Claude Desktop's own log for the server is `~/Library/Logs/Claude/mcp-server-bookshop.log` (named after the config key);
 the proxy's messages (`agenttrace proxy: recording 'bookshop' ...`) and any export errors appear there.

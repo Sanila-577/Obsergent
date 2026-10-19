@@ -65,3 +65,27 @@ export function prettyJson(text: string): { pretty: string; isJson: boolean } {
   }
   return { pretty: text, isJson: false };
 }
+
+/** Dollars for people: 0 -> "$0", 0.004 -> "< 1¢", 0.42 -> "$0.42", 12.5 -> "$12.50", 2400 -> "$2,400". Missing -> "-". */
+export function formatMoney(usd: number | null | undefined): string {
+  if (usd === null || usd === undefined || Number.isNaN(usd)) return "-";
+  if (usd === 0) return "$0";
+  if (usd < 0.01) return "< 1¢";
+  if (usd < 1000) return `$${usd.toFixed(2)}`;
+  return `$${Math.round(usd).toLocaleString()}`;
+}
+
+/** The same amount in a sentence: "less than 1 cent", "42 cents", "$1.20". */
+export function moneyInWords(usd: number | null | undefined): string {
+  if (usd === null || usd === undefined || Number.isNaN(usd)) return "an unknown amount";
+  if (usd === 0) return "nothing";
+  if (usd < 0.01) return "less than 1 cent";
+  if (usd < 1) return `${Math.round(usd * 100)} cent${Math.round(usd * 100) === 1 ? "" : "s"}`;
+  return formatMoney(usd);
+}
+
+/** Tokens as people say it: 1037 -> "1,037 words (tokens)". A token is about three quarters of a word. */
+export function formatTokens(n: number | null | undefined): string {
+  if (n === null || n === undefined) return "-";
+  return n >= 10_000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
+}

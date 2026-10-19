@@ -34,6 +34,16 @@ DEFAULTS = {
     "gateway": {"router": "http://localhost:8080", "controller": "http://localhost:9090/api/management/v1",
                 "username": "admin", "mcp_name": "wso2", "mcp_context": "/bookshop"},
     "bookshop": {"http_port": 9100},
+    "pricing": {
+        "enabled": True, "auto_refresh": True, "reprice": "call_time", "exact_from_provider": True, "credits_per_usd": 1,
+        "refresh_minutes": {"openrouter": 30, "huggingface": 30, "models_dev": 120, "litellm": 120},
+        "sources": {"models_dev": "https://models.dev/api.json",
+                    "openrouter": "https://openrouter.ai/api/v1/models",
+                    "huggingface": "https://router.huggingface.co/v1/models",
+                    "litellm": "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"},
+        "local_providers": ["ollama", "lmstudio", "llamacpp", "vllm"],
+        "overrides": {},
+    },
 }
 
 # Setting (dotted key) -> the environment variable that overrides it.
@@ -49,6 +59,10 @@ ENVIRONMENT = {
     "gateway.controller": "GATEWAY_CONTROLLER",
     "gateway.username": "WSO2AP_GW_USERNAME",
     "bookshop.http_port": "BOOKSHOP_PORT",
+    "pricing.enabled": "AGENTTRACE_PRICING",
+    "pricing.auto_refresh": "AGENTTRACE_PRICING_AUTO_REFRESH",
+    "pricing.exact_from_provider": "AGENTTRACE_PRICING_EXACT",
+    "pricing.reprice": "AGENTTRACE_PRICING_REPRICE",
 }
 
 
@@ -188,3 +202,55 @@ def gateway_mcp_url() -> str:
 def bookshop_http_port() -> int:
     """Port of the example MCP server over HTTP."""
     return int(get("bookshop.http_port"))
+
+
+# ------------------------------------------------------------------------------------------------ pricing
+def as_bool(value) -> bool:
+    """YAML gives True/False; an environment variable gives text such as "false" or "0"."""
+    return value if isinstance(value, bool) else str(value).strip().lower() not in ("false", "0", "no", "off", "")
+
+
+def pricing_enabled() -> bool:
+    """Whether costs are calculated at all."""
+    return as_bool(get("pricing.enabled"))
+
+
+def pricing_auto_refresh() -> bool:
+    """Whether prices are downloaded automatically (the one outbound call AgentTrace makes)."""
+    return as_bool(get("pricing.auto_refresh"))
+
+
+def pricing_refresh_minutes(source: str) -> float:
+    """How often one price list is checked for changes (minutes); the live lists more often than the community ones."""
+    minutes = get("pricing.refresh_minutes") or {}
+    return float(minutes.get(source, 120))
+
+
+def pricing_exact_from_provider() -> bool:
+    """Whether the cost a provider reports with each response (OpenRouter, xAI) replaces the estimate."""
+    return as_bool(get("pricing.exact_from_provider"))
+
+
+def pricing_credits_per_usd() -> float:
+    """OpenRouter reports credits; how many credits make one US dollar (1)."""
+    return float(get("pricing.credits_per_usd"))
+
+
+def pricing_reprice() -> str:
+    """"call_time" = price each call with the price valid when it was made; "now" = with today's price."""
+    return "now" if str(get("pricing.reprice")).strip().lower() == "now" else "call_time"
+
+
+def pricing_sources() -> dict:
+    """Name -> URL of each public price list."""
+    return dict(get("pricing.sources"))
+
+
+def pricing_local_providers() -> list[str]:
+    """Providers that run on your own machine: they cost nothing per token."""
+    return [str(name).lower() for name in get("pricing.local_providers")]
+
+
+def pricing_overrides() -> dict:
+    """Optional prices typed by hand: model -> {input_per_million, output_per_million, ...}. Normally empty."""
+    return dict(get("pricing.overrides") or {})

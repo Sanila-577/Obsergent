@@ -3,6 +3,39 @@
 
 export type Attributes = Record<string, unknown>;
 
+/** The cost of one model call (dollars), or why there is none. Always an estimate unless confidence is "exact". */
+export interface CostInfo {
+  usd: number | null;
+  status: "priced" | "local" | "unpriced";
+  confidence: "confirmed" | "one_source" | "disagree" | "exact" | "set_by_you" | "";
+  source: string;
+  model: string;
+  price_date_ns: number;
+  input_usd: number;
+  output_usd: number;
+  cache_usd: number;
+  note: string;
+  range_usd: [number, number] | null;
+  /** Where the money went, e.g. [{label: "input", usd: 0.0001}, ...]. */
+  breakdown: { label: string; usd: number }[];
+  /** batch / flex / priority when the call used a service tier. */
+  tier: string;
+}
+
+/** Totals for a run or a time window. `enabled: false` when pricing is switched off. */
+export interface CostTotals {
+  enabled?: boolean;
+  usd: number;
+  /** The part of `usd` the provider reported itself (OpenRouter, xAI); the rest is estimated from prices. */
+  exact_usd?: number;
+  estimated_usd?: number;
+  exact?: number;
+  priced: number;
+  local: number;
+  unpriced: number;
+  calls: number;
+}
+
 export interface Span {
   trace_id: string;
   span_id: string;
@@ -28,6 +61,8 @@ export interface Smell {
 
 export interface TraceDetail {
   trace_id: string;
+  question: string;
+  cost: CostTotals;
   spans: Span[];
   smells: Smell[];
 }
@@ -51,6 +86,8 @@ export interface TraceSummary {
   tools: string | null;
   decisions: string | null;
   smells_count: number;
+  question: string;
+  cost: CostTotals;
 }
 
 export type Severity = "high" | "medium" | "low";
@@ -73,6 +110,8 @@ export interface ToolStats extends LatencySummary {
 }
 
 export interface ModelUsage {
+  cost_usd?: number | null;
+  cost_status?: string | null;
   model: string;
   provider: string | null;
   calls: number;
@@ -98,6 +137,7 @@ export interface Overview {
   servers: number;
   sessions: number;
   models: ModelUsage[];
+  cost: Spending;
 }
 
 export interface Finding {
@@ -262,6 +302,7 @@ export interface GenerationSummary {
   completion_tokens: number | null;
   total_tokens: number | null;
   latency_ms: number;
+  cost?: CostTotals;
 }
 
 export interface Conversation {
@@ -271,6 +312,11 @@ export interface Conversation {
 }
 
 export interface Generation {
+  cost: CostInfo | null;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  reasoning_tokens: number;
+  tool_definition_tokens: number;
   span_id: string;
   span_name: string;
   start_ns: number;
@@ -311,6 +357,33 @@ export interface TraceFilters {
   model?: string;
   session_id?: string;
   since?: number;
+  until?: number;
   before_ns?: number;
   limit?: number;
+}
+
+/** `GET /api/spending`: everything the Spending page shows. */
+export interface Spending {
+  enabled: boolean;
+  totals: CostTotals;
+  by_model: { provider: string; model: string; usd: number; calls: number; prompt_tokens: number; completion_tokens: number;
+              status: string; confidence: string; note: string; source: string }[];
+  by_tool: { tool: string; usd: number; calls: number }[];
+  series: { start_ns: number; usd: number; by_model: Record<string, number> }[];
+  top_runs: { trace_id: string; usd: number; calls: number; start_ns: number; question: string }[];
+  reprice: string;
+}
+
+/** `GET /api/prices`: the badge "prices checked 2 hours ago" and the price-check panel. */
+export interface PriceStatus {
+  enabled: boolean;
+  auto_refresh: boolean;
+  exact_from_provider: boolean;
+  refresh_minutes: Record<string, number>;
+  changes: { provider: string; model: string; source: string; effective_from_ns: number; old_input: number | null;
+             new_input: number | null; old_output: number | null; new_output: number | null }[];
+  reprice: string;
+  sources: { source: string; models: number; checked_ns: number; fetched_ns: number; error: string }[];
+  last_checked_ns: number;
+  disagreements: { provider: string; model: string; prices: Record<string, [number, number]> }[];
 }

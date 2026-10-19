@@ -15,13 +15,14 @@ interface Item {
 
 export const PAGES: Item[] = [
   { group: "Pages", label: "Overview", to: "/", hint: "g o" },
-  { group: "Pages", label: "Runs", to: "/runs", hint: "g r" },
-  { group: "Pages", label: "Sessions", to: "/sessions", hint: "g s" },
-  { group: "Pages", label: "Servers & tools", to: "/servers", hint: "g t" },
-  { group: "Pages", label: "Findings", to: "/findings", hint: "g f" },
-  { group: "Pages", label: "Gateway (WSO2)", to: "/gateway", hint: "g w" },
-  { group: "Pages", label: "Map", to: "/map", hint: "g m" },
-  { group: "Pages", label: "Compare runs", to: "/compare" },
+  { group: "Pages", label: "Conversations", to: "/runs", hint: "g r" },
+  { group: "Pages", label: "App activity", to: "/sessions", hint: "g s" },
+  { group: "Pages", label: "Tools", to: "/servers", hint: "g t" },
+  { group: "Pages", label: "Spending: what the models cost", to: "/spending" },
+  { group: "Pages", label: "Things to check", to: "/findings", hint: "g f" },
+  { group: "Pages", label: "Gateway guard", to: "/gateway", hint: "g w" },
+  { group: "Pages", label: "Connections", to: "/map", hint: "g m" },
+  { group: "Pages", label: "Compare two conversations", to: "/compare" },
   { group: "Pages", label: "About: AgentTrace vs Langfuse", to: "/about" },
 ];
 
@@ -40,7 +41,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const items = useMemo<Item[]>(() => {
     const all: Item[] = [
       ...PAGES,
-      ...(runs.data ?? []).map((r) => ({ group: "Recent runs", label: r.root_name, hint: `${shortId(r.trace_id)} · ${formatMs(r.duration_ms)}`, to: `/runs/${r.trace_id}` })),
+      ...(runs.data ?? []).map((r) => ({ group: "Recent conversations", label: r.question || r.root_name, hint: `${shortId(r.trace_id)} · ${formatMs(r.duration_ms)}`, to: `/runs/${r.trace_id}` })),
       ...(tools.data ?? []).map((t) => ({ group: "Tools", label: String(t.tool), hint: t.server ?? "", to: `/runs?tool=${t.tool}` })),
       ...(servers.data ?? []).map((s) => ({ group: "Servers", label: s.server_name, hint: `${s.versions} version(s)`, to: `/servers?server=${s.server_name}` })),
     ];
@@ -65,7 +66,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   return (
     <div className="palette-overlay" onMouseDown={onClose} role="dialog" aria-label="Command palette">
       <div className="palette" onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKey}>
-        <input ref={input} value={text} placeholder="Jump to a page, run, tool or server…" onChange={(e) => { setText(e.target.value); setCursor(0); }} aria-label="Search" />
+        <input ref={input} value={text} placeholder="Jump to a page, conversation or tool…" onChange={(e) => { setText(e.target.value); setCursor(0); }} aria-label="Search" />
         <ul role="listbox">
           {items.length === 0 && <li className="muted">Nothing matches “{text}”</li>}
           {items.slice(0, 40).map((item, index) => {

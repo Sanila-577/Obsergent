@@ -5,6 +5,8 @@ import { api } from "../api/client";
 import type { ToolListDiff } from "../api/types";
 import { DiffText } from "../components/DiffText";
 import { JsonView } from "../components/JsonView";
+import { FirstRun } from "../components/FirstRun";
+import { Help } from "../components/Help";
 import { Card, DecisionBadge, EmptyState, PageHead, QueryState, SeverityBadge } from "../components/ui";
 import { formatMs, formatTime, timeAgo } from "../lib/format";
 import { useSettings } from "../lib/state";
@@ -44,26 +46,26 @@ export function Servers() {
   const compare = useQuery({ queryKey: ["server-compare", current, other], queryFn: () => api.serverCompare(current, other), enabled: !!current && !!other, retry: false });
 
   if (servers.isPending || tools.isPending) return <QueryState query={servers}>{() => null}</QueryState>;
-  if (names.length === 0) return <><PageHead title="Servers & tools" /><Card><EmptyState title="No MCP servers seen yet">Run an agent or an app through the proxy and its servers and tools show up here.</EmptyState></Card></>;
+  if (names.length === 0) return <><PageHead title="Tools" about="The tools your agents can use, how often they are used, and whether they changed." /><FirstRun kind="servers" title="No tools seen yet" /></>;
   const serverTools = (tools.data ?? []).filter((t) => t.server === current);
   const list = snapshots.data?.snapshots ?? [];
 
   return (
     <>
-      <PageHead title="Servers & tools" sub={`${names.length} server(s)`}>
-        <Link className="btn" to={`/gateway?server=${current}`}>Suggest an access policy →</Link>
+      <PageHead title="Tools" about="The tools your agents can use, how often they are used, and whether they changed." sub={`${names.length} tool server${names.length === 1 ? "" : "s"}`}>
+        <Link className="btn" to={`/gateway?server=${current}`}>Suggest which tools to allow →</Link>
       </PageHead>
       <div className="grid" style={{ gridTemplateColumns: "230px minmax(0,1fr)", alignItems: "start" }}>
         <Card flush>
           <table><tbody>{names.map((name) => (
             <tr key={name} className={`click${name === current ? " selected" : ""}`} onClick={() => setParams({ server: name })}>
-              <td><strong>{name}</strong><div className="muted" style={{ fontSize: 12 }}>{servers.data?.find((s) => s.server_name === name)?.versions ?? 0} tool-list version(s)</div></td></tr>))}</tbody></table>
+              <td><strong>{name}</strong><div className="muted" style={{ fontSize: 12 }}>{servers.data?.find((s) => s.server_name === name)?.versions ?? 0} version(s) of its tool list</div></td></tr>))}</tbody></table>
         </Card>
 
         <div className="col">
-          <Card title={`Tools used on ${current}`} flush>
-            {serverTools.length === 0 ? <EmptyState title="No calls in this time window" /> : (
-              <table><thead><tr><th>Tool</th><th className="num">Calls</th><th className="num">Errors</th><th className="num">median</th><th className="num">p95</th><th>Gateway</th><th>Last used</th></tr></thead>
+          <Card title={`Actions used on ${current}`} flush>
+            {serverTools.length === 0 ? <EmptyState title="Nothing used in this period" /> : (
+              <table><thead><tr><th>Action</th><th className="num">Times used</th><th className="num">Problems</th><th className="num">Typical<Help topic="typical" /></th><th className="num">Slowest 5%<Help topic="slowest" /></th><th>Gateway</th><th>Last used</th></tr></thead>
                 <tbody>{serverTools.map((t) => (
                   <tr key={t.tool}><td><Link to={`/runs?tool=${t.tool}&server=${current}`}>{t.tool}</Link></td><td className="num">{t.calls}</td><td className="num">{t.errors || "-"}</td>
                     <td className="num">{formatMs(t.p50_ms)}</td><td className="num">{formatMs(t.p95_ms)}</td>
@@ -72,7 +74,7 @@ export function Servers() {
             )}
           </Card>
 
-          <Card title="Version history of the tool list">
+          <Card title="Has this tool server changed?">
             {snapshots.error ? <EmptyState title="No tool list recorded for this server yet">It is saved the first time a client asks the server for its tools (<code>tools/list</code>) through the proxy.</EmptyState>
               : <QueryState query={snapshots}>{(s) => (
                 <div className="col">

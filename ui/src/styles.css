@@ -246,3 +246,42 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--border); borde
 .react-flow .react-flow__controls-button:hover { background: var(--panel-2); }
 .react-flow .react-flow__controls-button svg { fill: currentColor; max-width: 13px; max-height: 13px; }
 .react-flow .react-flow__edge-textbg { fill: var(--panel); }
+
+/* ---- money and the Spending page ---- */
+.ribbon { display: flex; gap: 3px; height: 34px; }
+.ribbon-seg { min-width: 46px; border: none; border-radius: 6px; color: #06101f; font-weight: 700; font-size: 12px; cursor: pointer; padding: 0 6px; }
+.ribbon-seg:hover { filter: brightness(1.12); outline: 2px solid var(--text); }
+.money { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.money.local { color: var(--ok); font-weight: 500; }
+.money.unpriced { color: var(--muted); font-weight: 400; font-style: italic; }
+.conf { margin-left: 3px; font-weight: 700; }
+.conf.confirmed, .conf.exact, .conf.set_by_you { color: var(--ok); }
+.conf.disagree { color: var(--warn); }
+.headline { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; font-size: 15px; }
+.headline .big { font-size: 44px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.notice { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--warn) 12%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent); font-size: 13px; }
+.share-list { list-style: none; margin: 0; padding: 0 0 6px; }
+.share-row { display: grid; grid-template-columns: minmax(120px, 1.2fr) 2fr 90px; gap: 4px 14px; align-items: center; padding: 9px 16px; color: var(--text); }
+.share-row:hover { background: var(--hover); text-decoration: none; }
+.share-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-bar { height: 10px; border-radius: 5px; background: var(--panel-2); overflow: hidden; }
+.share-bar span { display: block; height: 100%; border-radius: 5px; }
+.share-usd { text-align: right; }
+.share-detail { grid-column: 2 / 4; font-size: 12px; margin-top: -2px; }
+.price-badge { font-size: 12.5px; padding: 4px 2px; }
+
+/* ---- plain-language helpers: (?) bubble, first-run guide, page description ---- */
+.help { position: relative; display: inline-flex; vertical-align: middle; margin-left: 5px; color: var(--muted); cursor: help; }
+.help:hover, .help:focus { color: var(--accent); outline: none; }
+.help-bubble { display: none; position: absolute; z-index: 30; left: 50%; top: 125%; transform: translateX(-50%); width: 250px; padding: 8px 10px; background: var(--panel-2);
+  border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); color: var(--text); font-size: 12.5px; font-weight: 400; text-transform: none; letter-spacing: 0; line-height: 1.4; white-space: normal; }
+.help:hover .help-bubble, .help:focus .help-bubble { display: block; }
+.page-about { color: var(--muted); margin: -10px 0 16px; max-width: 70ch; }
+.first-run { max-width: 640px; margin: 18px auto; padding: 22px 26px; text-align: left; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
+.first-run h3 { font-size: 17px; margin: 0 0 4px; }
+.first-run ol { padding-left: 20px; display: grid; gap: 10px; }
+.first-run pre.code { margin: 6px 0; }
+.first-run .waiting { margin: 14px 0 0; font-weight: 600; }
+.first-run .waiting.ok { color: var(--ok); }
+
+.exact-tag { margin-left: 5px; padding: 0 5px; border-radius: 4px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }

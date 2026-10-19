@@ -10,6 +10,7 @@ queue worker in server mode) without a web server.
 import json
 
 # Gateway span normalization, the Span shape and the database interface.
+from agenttrace.ingest.billed import add_billing_attributes
 from agenttrace.ingest.gateway import normalize_gateway_spans
 from agenttrace.models import Span
 from agenttrace.storage.base import Backend
@@ -40,6 +41,7 @@ def tool_lists(spans: list[Span]) -> list[tuple[str, list[dict], int]]:
 
 def ingest_spans(spans: list[Span], backend: Backend) -> dict:
     """Save spans and remember any new version of an MCP server's tool list."""
+    add_billing_attributes(spans)  # the provider's own cost and billing facts, dug out of the recorded response
     normalize_gateway_spans(spans)  # API Manager's own spans get AgentTrace's attribute names first
     # Store the spans.
     backend.save_spans(spans)

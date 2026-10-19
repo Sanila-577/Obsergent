@@ -1,0 +1,225 @@
+{
+ "openai": {
+  "models": {
+   "gpt-4o-mini": {
+    "id": "gpt-4o-mini",
+    "name": "GPT-4o mini",
+    "description": "Small omni GPT for cheap multimodal assistance and production-scale traffic",
+    "family": "gpt-mini",
+    "attachment": true,
+    "reasoning": false,
+    "tool_call": true,
+    "structured_output": true,
+    "temperature": true,
+    "knowledge": "2023-09",
+    "release_date": "2024-07-18",
+    "last_updated": "2024-07-18",
+    "modalities": {
+     "input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 128000,
+     "output": 16384
+    },
+    "experimental": {
+     "modes": {
+      "fast": {
+       "cost": {
+        "input": 0.25,
+        "output": 1,
+        "cache_read": 0.125
+       },
+       "provider": {
+        "body": {
+         "service_tier": "priority"
+        }
+       }
+      }
+     }
+    },
+    "cost": {
+     "input": 0.15,
+     "output": 0.6,
+     "cache_read": 0.075
+    }
+   },
+   "gpt-4o": {
+    "id": "gpt-4o",
+    "name": "GPT-4o",
+    "description": "Omni-era GPT for multimodal chat, practical coding, and general assistants",
+    "family": "gpt",
+    "attachment": true,
+    "reasoning": false,
+    "tool_call": true,
+    "structured_output": true,
+    "temperature": true,
+    "knowledge": "2023-09",
+    "release_date": "2024-05-13",
+    "last_updated": "2024-08-06",
+    "modalities": {
+     "input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 128000,
+     "output": 16384
+    },
+    "experimental": {
+     "modes": {
+      "fast": {
+       "cost": {
+        "input": 4.25,
+        "output": 17,
+        "cache_read": 2.125
+       },
+       "provider": {
+        "body": {
+         "service_tier": "priority"
+        }
+       }
+      }
+     }
+    },
+    "cost": {
+     "input": 2.5,
+     "output": 10,
+     "cache_read": 1.25
+    }
+   }
+  }
+ },
+ "anthropic": {
+  "models": {
+   "claude-sonnet-4-5": {
+    "id": "claude-sonnet-4-5",
+    "name": "Claude Sonnet 4.5 (latest)",
+    "description": "Balanced Claude model for coding, analysis, agent workflows, and cost control",
+    "family": "claude-sonnet",
+    "attachment": true,
+    "reasoning": true,
+    "reasoning_options": [
+     {
+      "type": "budget_tokens",
+      "min": 1024
+     }
+    ],
+    "tool_call": true,
+    "structured_output": true,
+    "temperature": true,
+    "knowledge": "2025-07-31",
+    "release_date": "2025-09-29",
+    "last_updated": "2025-09-29",
+    "modalities": {
+     "input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 200000,
+     "output": 64000
+    },
+    "cost": {
+     "input": 3,
+     "output": 15,
+     "cache_read": 0.3,
+     "cache_write": 3.75
+    },
+    "canonical_model_id": "anthropic/claude-sonnet-4-5"
+   }
+  }
+ },
+ "groq": {
+  "models": {
+   "llama-3.3-70b-versatile": {
+    "id": "llama-3.3-70b-versatile",
+    "name": "Llama 3.3 70B",
+    "description": "Open Llama instruction model for multilingual chat, reasoning, and coding",
+    "family": "llama",
+    "attachment": false,
+    "reasoning": false,
+    "tool_call": true,
+    "temperature": true,
+    "knowledge": "2023-12",
+    "release_date": "2024-12-06",
+    "last_updated": "2024-12-06",
+    "modalities": {
+     "input": [
+      "text"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "open_weights": true,
+    "limit": {
+     "context": 131072,
+     "output": 32768
+    },
+    "cost": {
+     "input": 0.59,
+     "output": 0.79
+    }
+   }
+  }
+ },
+ "openrouter": {
+  "models": {
+   "openai/gpt-4o-mini": {
+    "id": "openai/gpt-4o-mini",
+    "name": "GPT-4o mini",
+    "description": "Small omni GPT for cheap multimodal assistance and production-scale traffic",
+    "family": "gpt-mini",
+    "attachment": true,
+    "reasoning": false,
+    "tool_call": true,
+    "structured_output": true,
+    "temperature": true,
+    "knowledge": "2023-09",
+    "release_date": "2024-07-18",
+    "last_updated": "2024-07-18",
+    "modalities": {
+     "input": [
+      "text",
+      "image",
+      "pdf"
+     ],
+     "output": [
+      "text"
+     ]
+    },
+    "open_weights": false,
+    "limit": {
+     "context": 128000,
+     "output": 16384
+    },
+    "cost": {
+     "input": 0.15,
+     "output": 0.6,
+     "cache_read": 0.075
+    },
+    "canonical_model_id": "openai/gpt-4o-mini"
+   }
+  }
+ }
+}

@@ -9,6 +9,7 @@ import { Overview } from "./pages/Overview";
 import { RunDetail } from "./pages/RunDetail";
 import { Runs } from "./pages/Runs";
 import { Servers } from "./pages/Servers";
+import { Spending } from "./pages/Spending";
 import { SessionDetail, Sessions } from "./pages/Sessions";
 import { Skeleton } from "./components/ui";
 
@@ -25,6 +26,7 @@ export function App() {
         <Route path="sessions" element={<Sessions />} />
         <Route path="sessions/:id" element={<SessionDetail />} />
         <Route path="servers" element={<Servers />} />
+        <Route path="spending" element={<Spending />} />
         <Route path="findings" element={<Findings />} />
         <Route path="gateway" element={<Gateway />} />
         <Route path="map" element={<Suspense fallback={<Skeleton lines={4} />}><MapPage /></Suspense>} />

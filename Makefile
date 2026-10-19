@@ -55,7 +55,7 @@ up-grpc:  ## same, plus the gRPC receiver on :4317 (first stops anything on eith
 	$(VENV_BIN)/agenttrace up --grpc
 
 ##@ Look at what was recorded (terminal; the web UI shows the same)
-.PHONY: traces show sessions drift config
+.PHONY: traces show sessions drift config prices prices-status
 traces:  ## list the recorded runs, newest first (LIMIT=N for more, default 20)
 	$(VENV_BIN)/agenttrace traces --limit $(or $(LIMIT),20)
 show:  ## one run as a span tree: make show ID=<first characters of a run id from `make traces`>
@@ -65,6 +65,10 @@ sessions:  ## list proxy sessions (one per proxy process, e.g. what Claude Deskt
 	$(VENV_BIN)/agenttrace sessions
 drift:  ## MCP servers whose tool descriptions changed since first seen
 	$(VENV_BIN)/agenttrace drift
+prices:  ## download the model price lists now (they also refresh by themselves while `make up` runs)
+	$(VENV_BIN)/agenttrace prices refresh
+prices-status:  ## when the price lists were last downloaded
+	$(VENV_BIN)/agenttrace prices status
 config:  ## the settings in use (config.yaml + environment)
 	$(VENV_BIN)/agenttrace config
 

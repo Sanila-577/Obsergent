@@ -3,7 +3,7 @@
 import type {
   Conversation, Finding, GatewayCall, GatewaySummary, Generations, ModelUsage, Overview, PolicySuggestion, RunDiff,
   ServerInfo, Session, SnapshotsResponse, TimelineEvent, ToolListDiff, ToolStats, Topology, TraceDetail, TraceFilters,
-  TraceSummary, Span,
+  TraceSummary, Span, Spending, PriceStatus,
 } from "./types";
 
 // An error that remembers the HTTP status (404, 500...).
@@ -68,5 +68,8 @@ export const api = {
   gateway: (hours: number) => request<GatewaySummary>("/api/gateway/summary", { hours }),
   gatewayCall: (activityId: string) =>
     request<{ call: GatewayCall | null; spans: Span[] }>(`/api/gateway/calls/${encodeURIComponent(activityId)}`),
+  spending: (hours: number, buckets = 24, reprice?: string) => request<Spending>("/api/spending", { hours, buckets, reprice }),
+  prices: () => request<PriceStatus>("/api/prices"),
+  refreshPrices: () => request<PriceStatus>("/api/prices/refresh", undefined, { method: "POST" }),
   policy: (server: string) => request<PolicySuggestion>("/api/policy/suggestion", { server }),
 };

@@ -1,8 +1,8 @@
 """End to end with a REAL model: the bookshop agent -> SDK + proxy -> live server -> API.
 
-Runs only when .env (or the environment) selects Ollama and Ollama is running with that model (default qwen2.5:7b),
-otherwise it is skipped. Nothing is scripted: the model decides which tools to call, so the checks are about what must
-be true of ANY run.
+Runs only when Ollama is running with the model (default qwen2.5:7b, or AGENTTRACE_TEST_MODEL), otherwise it is skipped.
+It forces Ollama for the agent, so a paid provider chosen in .env is never called by the tests.
+Nothing is scripted: the model decides which tools to call, so the checks are about what must be true of ANY run.
 """
 import os
 import subprocess
@@ -16,13 +16,11 @@ from conftest import BOOKSHOP
 
 AGENT_DIR = BOOKSHOP.parent
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-PROVIDER = os.environ.get("LLM_PROVIDER", "ollama").lower()
-MODEL = os.environ.get("LLM_MODEL") or "qwen2.5:7b"
+# This test always uses a local Ollama model, whatever .env says (your .env may point at a paid service).
+MODEL = os.environ.get("AGENTTRACE_TEST_MODEL", "qwen2.5:7b")
 
 
 def ollama_has_model() -> bool:
-    if PROVIDER != "ollama":
-        return False
     try:
         names = [m["name"] for m in httpx.get(f"{OLLAMA}/api/tags", timeout=2).json()["models"]]
     except (httpx.HTTPError, KeyError, ValueError):
@@ -31,7 +29,7 @@ def ollama_has_model() -> bool:
 
 
 def run_agent(endpoint: str, question: str = "Do you have a Python book in stock, and how much is it?") -> str:
-    env = dict(os.environ, AGENTTRACE_ENDPOINT=endpoint)
+    env = dict(os.environ, AGENTTRACE_ENDPOINT=endpoint, LLM_PROVIDER="ollama", LLM_MODEL=MODEL)
     for name in ("MCP_PROXY_TRACEPARENT", "TRACEPARENT"):
         env.pop(name, None)
     done = subprocess.run([sys.executable, "agent.py", question], cwd=AGENT_DIR, env=env, capture_output=True,
@@ -50,7 +48,7 @@ def wait_for_run(url: str, attempts: int = 60) -> dict:
     raise AssertionError("the run never appeared in the API")
 
 
-@pytest.mark.skipif(not ollama_has_model(), reason="needs Ollama running with the model (LLM_PROVIDER/LLM_MODEL in .env)")
+@pytest.mark.skipif(not ollama_has_model(), reason="needs Ollama running with the model (default qwen2.5:7b)")
 def test_real_agent_run_is_recorded_end_to_end(live_server):
     url, _ = live_server
     assert run_agent(url)

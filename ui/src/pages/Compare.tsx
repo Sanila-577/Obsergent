@@ -5,6 +5,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { JsonView } from "../components/JsonView";
 import { Card, EmptyState, PageHead, QueryState } from "../components/ui";
+import { PAGES } from "../lib/words";
 import { formatMs, formatTime, shortId } from "../lib/format";
 
 export function Compare() {
@@ -23,20 +24,20 @@ export function Compare() {
 
   return (
     <>
-      <PageHead title="Compare runs" sub="where did two runs stop behaving the same way?" />
+      <PageHead title={PAGES.compare.title} about={PAGES.compare.about} />
       <div className="card row wrap" style={{ marginBottom: 14 }}><span className="muted">A</span>{options(a)}<ArrowRight size={14} /><span className="muted">B</span>{options(b)}</div>
-      {!a || !b ? <Card><EmptyState title="Choose two runs">Pick them above, or tick two runs in the Runs list and press “Compare”.</EmptyState></Card> : (
+      {!a || !b ? <Card><EmptyState title="Choose two conversations">Pick them above, or tick two in the Conversations list and press “Compare these 2”.</EmptyState></Card> : (
         <QueryState query={diff}>{(d) => {
           const length = Math.max(d.steps_a.length, d.steps_b.length);
           const divergence = d.divergence.same ? null : (d.divergence.step ?? 0);
           return (
             <div className="col">
               <Card>{d.divergence.same
-                ? <div className="row"><span className="badge ok">same</span> Both runs made the same {d.divergence.steps} tool call(s) with the same arguments.</div>
-                : <div className="row wrap"><span className="badge high">diverged at step {divergence}</span><strong>{d.divergence.reason}</strong></div>}</Card>
+                ? <div className="row"><span className="badge ok">same</span> Both conversations used the same {d.divergence.steps} action(s) with the same inputs.</div>
+                : <div className="row wrap"><span className="badge high">first difference at action {divergence}</span><strong>{d.divergence.reason}</strong></div>}</Card>
               <div className="grid two">
                 {([["A", d.a, d.steps_a], ["B", d.b, d.steps_b]] as const).map(([label, id, steps]) => (
-                  <Card key={label} title={<span>Run {label} <Link to={`/runs/${id}`} className="mono">{shortId(id)}</Link></span>} flush>
+                  <Card key={label} title={<span>Conversation {label} <Link to={`/runs/${id}`} className="mono">{shortId(id)}</Link></span>} flush>
                     {Array.from({ length }, (_, index) => {
                       const step = steps[index];
                       const marked = divergence === index + 1;

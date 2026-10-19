@@ -39,3 +39,25 @@ gateway:
 # The example MCP server over HTTP (examples/bookshop/bookshop_http.py), which the gateway protects.
 bookshop:
   http_port: 9100        # [BOOKSHOP_PORT]
+
+# What a model call costs. Prices are downloaded automatically from public price lists (nothing of yours is sent) and
+# kept in the database with their history; the cost is calculated each time it is shown, from the recorded token counts.
+pricing:
+  enabled: true          # [AGENTTRACE_PRICING] false = no costs at all
+  auto_refresh: true     # [AGENTTRACE_PRICING_AUTO_REFRESH] false = never download (the only outbound call AgentTrace makes)
+  refresh_minutes:       # how often each list is checked for changes (the live ones more often; a check costs a few hundred bytes)
+    openrouter: 30
+    huggingface: 30
+    models_dev: 120
+    litellm: 120
+  exact_from_provider: true   # use the cost OpenRouter and xAI send with every response instead of an estimate
+  credits_per_usd: 1          # OpenRouter reports credits; 1 credit = 1 US dollar (checked against its Activity page)
+  reprice: call_time     # [AGENTTRACE_PRICING_REPRICE] call_time = the price valid when the call was made; now = today's price
+  sources:               # the public price lists, in the order they are consulted (see docs/costs.md)
+    models_dev: https://models.dev/api.json
+    openrouter: https://openrouter.ai/api/v1/models
+    huggingface: https://router.huggingface.co/v1/models
+    litellm: https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json
+  local_providers: [ollama, lmstudio, llamacpp, vllm]   # run on your machine: cost $0, shown as "local"
+  overrides: {}          # optional, normally empty. Example: {"my-model": {input_per_million: 0.5, output_per_million: 1.5}}
+

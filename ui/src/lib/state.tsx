@@ -39,6 +39,9 @@ interface Settings {
   setHours: (hours: number) => void;
   theme: Theme;
   setTheme: (theme: Theme) => void;
+  /** false = Simple (plain words, no ids or raw data); true = Detailed (everything). */
+  detailed: boolean;
+  setDetailed: (detailed: boolean) => void;
 }
 
 // The shared "box" every component can read from.
@@ -52,12 +55,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [hours, setHours] = useRemembered("hours", 24);
   // Dark or light.
   const [theme, setTheme] = useRemembered<Theme>("theme", "dark");
+  const [detailed, setDetailed] = useRemembered("detailed", false);
   // { => Whenever the theme changes, tag <html data-theme=...> so CSS can switch colors.
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
   // Rebuild the shared object only when something changed.
-  const value = useMemo(() => ({ live, setLive, hours, setHours, theme, setTheme }), [live, hours, theme]);
+  const value = useMemo(() => ({ live, setLive, hours, setHours, theme, setTheme, detailed, setDetailed }), [live, hours, theme, detailed]);
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }
 

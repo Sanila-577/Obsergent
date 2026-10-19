@@ -55,6 +55,10 @@ class Storage(Protocol):
     def list_calls(self, since_ns: int | None = None, limit: int = 5000) -> list[dict]:
         """Every recorded MCP tool call with server, tool, duration, status and gateway decision."""
 
+    # Every model call, for the cost views.
+    def list_llm_spans(self, since_ns: int | None = None, limit: int = 20000) -> list[Span]:
+        """Spans that are model calls, newest first."""
+
     # Number of tool calls (and failures) per time slot, for the chart on the Overview page.
     def activity_series(self, since_ns: int, until_ns: int, buckets: int) -> list[dict]:
         """Tool calls and errors per time bucket."""
@@ -97,6 +101,25 @@ class MetaStore(Protocol):
     # Which findings are currently dismissed.
     def list_acknowledged(self) -> dict[str, int]:
         """Dismissed finding ids and when they were dismissed."""
+
+    # --- prices (what a model costs; see analysis/pricing.py and server/price_sync.py) ---
+    def save_prices(self, source: str, rows: list[dict], now_ns: int) -> int:
+        """Store the prices a source reported (only the ones that changed). Returns how many rows were added."""
+
+    def price_rows(self, models: list[str]) -> list[dict]:
+        """The whole price history of these model names, oldest first."""
+
+    def all_current_prices(self) -> list[dict]:
+        """The newest price of every (source, provider, model)."""
+
+    def save_sync(self, source: str, etag: str, fetched_ns: int, checked_ns: int, models: int, error: str = "") -> None:
+        """Remember when a price list was downloaded."""
+
+    def list_sync(self) -> list[dict]:
+        """When each price list was last downloaded / checked."""
+
+    def price_changes(self, since_ns: int, limit: int = 30) -> list[dict]:
+        """Prices that changed since a moment (old and new input/output), newest first."""
 
 
 # One combined interface: a database object that can do both of the above. The server only needs this.

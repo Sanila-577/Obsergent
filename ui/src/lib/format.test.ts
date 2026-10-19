@@ -1,4 +1,4 @@
-import { formatCount, formatMs, formatPercent, prettyJson, shortId, splitList, timeAgo } from "./format";
+import { formatCount, formatMoney, formatMs, formatPercent, formatTokens, moneyInWords, prettyJson, shortId, splitList, timeAgo } from "./format";
 
 describe("formatMs", () => {
   it.each([[0.4, "0.40 ms"], [12.34, "12.3 ms"], [340, "340 ms"], [1520, "1.52 s"], [125_000, "2 m 5 s"]])("%s -> %s", (input, expected) => {
@@ -39,5 +39,24 @@ describe("other formatters", () => {
     expect(prettyJson('{"a":1}')).toEqual({ pretty: '{\n  "a": 1\n}', isJson: true });
     expect(prettyJson("just text")).toEqual({ pretty: "just text", isJson: false });
     expect(prettyJson("42").isJson).toBe(false); // a bare number is not worth pretty-printing
+  });
+});
+
+describe("money", () => {
+  it.each([[0, "$0"], [0.0004, "< 1¢"], [0.42, "$0.42"], [12.5, "$12.50"], [2400, "$2,400"], [null, "-"], [NaN, "-"]])("%s -> %s", (input, expected) => {
+    expect(formatMoney(input as number | null)).toBe(expected);
+  });
+  it("says amounts in words", () => {
+    expect(moneyInWords(0)).toBe("nothing");
+    expect(moneyInWords(0.004)).toBe("less than 1 cent");
+    expect(moneyInWords(0.01)).toBe("1 cent");
+    expect(moneyInWords(0.42)).toBe("42 cents");
+    expect(moneyInWords(3.5)).toBe("$3.50");
+    expect(moneyInWords(null)).toBe("an unknown amount");
+  });
+  it("shortens token counts", () => {
+    expect(formatTokens(1037)).toBe("1,037");
+    expect(formatTokens(25_000)).toBe("25.0k");
+    expect(formatTokens(null)).toBe("-");
   });
 });

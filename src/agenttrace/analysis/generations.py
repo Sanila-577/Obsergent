@@ -90,7 +90,29 @@ class Generation:
     total_tokens: int | None
     status_code: str
     status_message: str
+    # The parts of the prompt that were read from / written to the provider's cache, and the reasoning part of the answer.
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+    reasoning_tokens: int = 0
+    # A cost the provider itself reported (OpenInference: llm.cost.total), which beats any estimate.
+    billed_usd: float | None = None
+    # About how many tokens the tool descriptions in the prompt take (characters / 4: an estimate).
+    tool_definition_tokens: int = 0
+    # Facts that change the price of a call (all from the provider's own usage report; see ingest/billed.py).
+    service_tier: str | None = None  # standard / batch / flex / priority
+    cache_write_1h_tokens: int = 0  # cache writes that last an hour (Anthropic bills those at twice the input price)
+    web_search_requests: int = 0  # searches the provider ran for the model (billed per search)
+    inference_geo: str | None = None  # where the model ran (Anthropic: "us" costs 1.1x)
+    audio_in_tokens: int = 0
+    audio_out_tokens: int = 0
+    extra_output_tokens: int = 0  # output billed but reported next to the completion count (Gemini thinking)
+    billed_prompt_tokens: int | None = None  # Cohere bills on "billed units"
+    billed_completion_tokens: int | None = None
+    billed_source: str | None = None  # openrouter / xai / ...: who reported billed_usd
+    upstream_usd: float | None = None  # OpenRouter bring-your-own-key: what your provider charged
     tool_links: list[ToolLink] = field(default_factory=list)
+    # The cost of this call, filled in by the server (server/costing.py) as a plain dict.
+    cost: dict | None = None
 
     @property
     # How long the model call took.
@@ -184,6 +206,13 @@ def parse_parameters(attributes: dict) -> dict:
 
 
 # Names of the tools offered to the model.
+def tool_definition_tokens(attributes: dict) -> int:
+    """About how many tokens the tool descriptions in the prompt take: their text length divided by 4 (an estimate)."""
+    characters = sum(len(str(value)) for key, value in attributes.items()
+                     if re.fullmatch(r"llm\.tools\.\d+\.tool\.json_schema", key))
+    return round(characters / 4)
+
+
 def parse_tool_names(attributes: dict) -> list[str]:
     """Names of the tools offered to the model (llm.tools.N.tool.json_schema)."""
     # Collected names.
@@ -227,6 +256,14 @@ def to_generation(span: Span) -> Generation:
     # Compute the total if only the parts are known.
     if total is None and prompt is not None and completion is not None:
         total = int(prompt) + int(completion)
+    # Cached and reasoning tokens, when the instrumentation reports them (OpenInference names first, then GenAI names).
+    cache_read = first_attribute(attrs, "llm.token_count.prompt_details.cache_read", "gen_ai.usage.cache_read_input_tokens")
+    cache_write = first_attribute(attrs, "llm.token_count.prompt_details.cache_write", "gen_ai.usage.cache_creation_input_tokens")
+    reasoning = first_attribute(attrs, "llm.token_count.completion_details.reasoning", "gen_ai.usage.reasoning_tokens")
+    billed = first_attribute(attrs, "llm.cost.total")
+    billed_in = first_attribute(attrs, "agenttrace.billed_units.input")
+    billed_out = first_attribute(attrs, "agenttrace.billed_units.output")
+    upstream = first_attribute(attrs, "agenttrace.cost.upstream_usd")
     # Fill the record from the attributes.
     return Generation(
         span_id=span.span_id,
@@ -245,6 +282,22 @@ def to_generation(span: Span) -> Generation:
         total_tokens=int(total) if total is not None else None,
         status_code=span.status_code,
         status_message=span.status_message,
+        cache_read_tokens=int(cache_read or 0),
+        cache_write_tokens=int(cache_write or 0),
+        reasoning_tokens=int(reasoning or 0),
+        billed_usd=float(billed) if billed is not None else None,
+        tool_definition_tokens=tool_definition_tokens(attrs),
+        service_tier=first_attribute(attrs, "llm.service_tier"),
+        cache_write_1h_tokens=int(first_attribute(attrs, "agenttrace.cache_write_1h_tokens") or 0),
+        web_search_requests=int(first_attribute(attrs, "agenttrace.web_search_requests") or 0),
+        inference_geo=first_attribute(attrs, "agenttrace.inference_geo"),
+        audio_in_tokens=int(first_attribute(attrs, "llm.token_count.prompt_details.audio") or 0),
+        audio_out_tokens=int(first_attribute(attrs, "llm.token_count.completion_details.audio") or 0),
+        extra_output_tokens=int(first_attribute(attrs, "agenttrace.extra_output_tokens") or 0),
+        billed_prompt_tokens=int(billed_in) if billed_in is not None else None,
+        billed_completion_tokens=int(billed_out) if billed_out is not None else None,
+        billed_source=first_attribute(attrs, "agenttrace.cost.source"),
+        upstream_usd=float(upstream) if upstream is not None else None,
     )
 
 

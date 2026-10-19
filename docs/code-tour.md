@@ -8,24 +8,24 @@ comment above (almost) every line; this tour tells you which file to open first 
 
 ## 1. Words you need (plain language)
 
-| Word | Meaning |
-|---|---|
-| **MCP** (Model Context Protocol) | A standard way for an AI app (the *client*) to ask a *server* "what tools do you have?" and "please run this tool". |
-| **JSON-RPC** | The message format MCP uses. A message is a small JSON object. Three kinds, see below. |
-| **stdio** | "Standard input/output". A program reads text from its *stdin* pipe and writes text to its *stdout* pipe. MCP over stdio = the client starts the server as a child process and they talk through these two pipes, one JSON message per line. |
-| **HTTP / Streamable HTTP** | The same JSON-RPC messages, but sent with web requests (`POST /mcp`). The reply is either plain JSON or an **SSE** stream (a response that keeps sending `data: {...}` lines). |
-| **gRPC** | A different way for two programs to call each other over a network. Instead of text JSON over HTTP/1, it sends compact binary messages (**protobuf**) over HTTP/2, and you call named functions ("RPC" = remote procedure call) like `TraceService.Export`. AgentTrace needs it for exactly one reason: the WSO2 gateway sends its telemetry to port 4317 (`server.grpc_port` in `config.yaml`) using gRPC, not HTTP. |
-| **protobuf** | The binary format gRPC uses. Smaller and faster than JSON, but not human readable. |
-| **OpenTelemetry (OTel)** | A standard for recording what a program does. |
-| **span** | One recorded step: a name, start time, end time, status, extra details (*attributes*). |
-| **trace** | All spans of one run. They share a `trace_id`; each span points to its parent with `parent_span_id`, so they form a tree. |
-| **OTLP** | "OpenTelemetry Protocol": how spans travel from a program to a collector. It comes in two flavours: over HTTP (`POST /v1/traces`) and over gRPC (port 4317). AgentTrace accepts both. |
-| **traceparent** | A small text `00-<trace id>-<span id>-01` that says "I am part of this trace, under this span". Passing it along is how the agent, the proxy and the gateway end up in the *same* trace. |
-| **Proxy** | A program placed in the middle. The client talks to the proxy, the proxy forwards to the real server, and notes everything on the way. |
-| **Gateway** | A proxy that also enforces rules (login, rate limits, which tools are allowed). WSO2 API Manager is one. |
-| **SQLite** | A database stored in one file (`~/.agenttrace/agenttrace.db`). No server to install. |
-| **FastAPI / uvicorn** | FastAPI is a Python web framework (you write functions, each becomes a URL). uvicorn is the program that actually listens on the port and runs it. |
-| **React / React Query** | React draws the web page from data; React Query fetches that data from the API and caches it. |
+| Word                                   | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **MCP** (Model Context Protocol) | A standard way for an AI app (the *client*) to ask a *server* "what tools do you have?" and "please run this tool".                                                                                                                                                                                                                                                                                                           |
+| **JSON-RPC**                     | The message format MCP uses. A message is a small JSON object. Three kinds, see below.                                                                                                                                                                                                                                                                                                                                            |
+| **stdio**                        | "Standard input/output". A program reads text from its *stdin* pipe and writes text to its *stdout* pipe. MCP over stdio = the client starts the server as a child process and they talk through these two pipes, one JSON message per line.                                                                                                                                                                                  |
+| **HTTP / Streamable HTTP**       | The same JSON-RPC messages, but sent with web requests (`POST /mcp`). The reply is either plain JSON or an **SSE** stream (a response that keeps sending `data: {...}` lines).                                                                                                                                                                                                                                          |
+| **gRPC**                         | A different way for two programs to call each other over a network. Instead of text JSON over HTTP/1, it sends compact binary messages (**protobuf**) over HTTP/2, and you call named functions ("RPC" = remote procedure call) like `TraceService.Export`. AgentTrace needs it for exactly one reason: the WSO2 gateway sends its telemetry to port 4317 (`server.grpc_port` in `config.yaml`) using gRPC, not HTTP. |
+| **protobuf**                     | The binary format gRPC uses. Smaller and faster than JSON, but not human readable.                                                                                                                                                                                                                                                                                                                                                |
+| **OpenTelemetry (OTel)**         | A standard for recording what a program does.                                                                                                                                                                                                                                                                                                                                                                                     |
+| **span**                         | One recorded step: a name, start time, end time, status, extra details (*attributes*).                                                                                                                                                                                                                                                                                                                                          |
+| **trace**                        | All spans of one run. They share a `trace_id`; each span points to its parent with `parent_span_id`, so they form a tree.                                                                                                                                                                                                                                                                                                     |
+| **OTLP**                         | "OpenTelemetry Protocol": how spans travel from a program to a collector. It comes in two flavours: over HTTP (`POST /v1/traces`) and over gRPC (port 4317). AgentTrace accepts both.                                                                                                                                                                                                                                           |
+| **traceparent**                  | A small text `00-<trace id>-<span id>-01` that says "I am part of this trace, under this span". Passing it along is how the agent, the proxy and the gateway end up in the *same* trace.                                                                                                                                                                                                                                      |
+| **Proxy**                        | A program placed in the middle. The client talks to the proxy, the proxy forwards to the real server, and notes everything on the way.                                                                                                                                                                                                                                                                                            |
+| **Gateway**                      | A proxy that also enforces rules (login, rate limits, which tools are allowed). WSO2 API Manager is one.                                                                                                                                                                                                                                                                                                                          |
+| **SQLite**                       | A database stored in one file (`~/.agenttrace/agenttrace.db`). No server to install.                                                                                                                                                                                                                                                                                                                                            |
+| **FastAPI / uvicorn**            | FastAPI is a Python web framework (you write functions, each becomes a URL). uvicorn is the program that actually listens on the port and runs it.                                                                                                                                                                                                                                                                                |
+| **React / React Query**          | React draws the web page from data; React Query fetches that data from the API and caches it.                                                                                                                                                                                                                                                                                                                                     |
 
 ### The three JSON-RPC message kinds
 
@@ -151,6 +151,7 @@ agent.py (MCP_URL=http://127.0.0.1:7319/mcp/wso2)
                           └─► POST /v1/traces                        └─► gRPC :4317 (server/grpc_receiver.py)
                                           both land in ingest_spans → SQLite, in ONE trace
 ```
+
 The agent's `trace_tool_calls` puts the tool step's trace id in the request; the proxy makes its span a child of it and
 forwards its own id in the `traceparent` header; the gateway continues that trace. Result in the UI:
 `agent.run → LangGraph → tools → search_books → tools/call (proxy) → ingress (gateway) → policy engine / backend`.
@@ -168,6 +169,24 @@ WSO2 → gRPC call `TraceService.Export` on port 4317 → `server/grpc_receiver.
 4. `server/app.py` handles it: reads from `storage/sqlite.py` and/or `analysis/*`, returns JSON. React draws it.
 5. In Live mode, React Query re-fetches every 2 seconds.
 
+### Path 6b: the cost of a model call
+
+Costs are never stored on spans: they are calculated when something asks for them.
+
+0. **The provider's own charge:** when a span arrives, `ingest/billed.py` (called from `ingest/pipeline.py`) digs OpenRouter's `usage.cost` or xAI's `cost_in_usd_ticks` out of the recorded response and stores it as `llm.cost.total`, plus facts the formula needs (service tier, 1-hour cache writes, web searches).
+1. **Prices in:** `cmd_up` → `server/price_sync.py: start_background_refresh` downloads four public price lists
+   (models.dev, OpenRouter, Hugging Face, LiteLLM) in a background thread, with ETag so unchanged lists are skipped; each
+   parser turns its list into rows (`provider, model, input, output, cache_read, cache_write` per million tokens);
+   `storage/sqlite.py: save_prices` adds a row only when a price changed (a history).
+2. **A page asks:** e.g. `GET /api/traces` or `/api/spending` in `server/app.py` → `server/costing.py: CostCalculator`.
+3. **Per model call:** `analysis/generations.py: to_generation` reads the token counts (and cached/reasoning counts) from the span,
+   `server/costing.py` loads the price rows for that model, and `analysis/pricing.py: cost_of_call` decides: a cost the provider
+   reported, a local model ($0), the price (router's list first, then models.dev, then LiteLLM) and the formula, or "no price".
+4. **Totals:** `pricing.sum_costs`; the Spending page data comes from `costing.spending` (by model, by tool, over time, top runs).
+5. **UI:** `ui/src/pages/Spending.tsx`, `components/CostRibbon.tsx`, `components/Money.tsx`.
+
+Full explanation: [costs.md](costs.md).
+
 ### Path 7: the command line reading data — `agenttrace traces | show | sessions | drift`
 
 `cli.py` opens the SQLite file directly (no server needed) and prints.
@@ -179,10 +198,12 @@ WSO2 → gRPC call `TraceService.Export` on port 4317 → `server/grpc_receiver.
 Each line tells you *what the file is for* and *what to look for*.
 
 ### A. The vocabulary (5 minutes)
+
 1. `config.yaml` (repository root) — every port, address and path, with a comment on each. Then `src/agenttrace/config.py`: it loads that file once and answers through functions (`port()`, `grpc_port()`, `endpoint()`, `db_path()`, `proxy_port()`, `gateway_router()`, ...). Precedence: environment variable, then the YAML, then the built-in default. `agenttrace config` prints what is in use.
 2. `src/agenttrace/models.py` — the one `Span` class everything uses. Read every field.
 
 ### B. Recording (the proxy)
+
 3. `proxy/redact.py` — secret hiding. Look at `redact()` (recursive) and `safe_command()`.
 4. `proxy/sessions.py` — `Session` and `make_provider()`: how a proxy process gets an id and an exporter.
 5. `proxy/recorder.py` — **the most important file.** Follow `pending`: filled in `on_request`, emptied in `on_response`.
@@ -193,34 +214,41 @@ Each line tells you *what the file is for* and *what to look for*.
 10. `sdk/setup.py` — what the agent calls: `init`, `context`, `trace_tool_calls`, `proxy_server`.
 
 ### C. Receiving
+
 11. `ingest/otlp.py` — decode OTLP (protobuf/JSON) into `Span`s.
 12. `ingest/gateway.py` — translate WSO2's span vocabulary into AgentTrace's.
-13. `ingest/pipeline.py` — `ingest_spans`: normalize → save → remember tool lists.
+13. `ingest/pipeline.py` — `ingest_spans`: normalize → save → remember tool lists. Then, for costs: `server/price_sync.py` (download prices), `analysis/pricing.py` (the formula, pure functions) and `server/costing.py` (glue to the database).
 14. `server/grpc_receiver.py` — the gRPC door.
 
 ### D. Storage
+
 15. `storage/base.py` — the *list of methods* a database must have (no logic).
 16. `storage/sqlite.py` — read `SCHEMA_V1…V4` first (tables and views), then `save_spans`, then `list_traces`.
     SQL is explained clause by clause in comments.
 
 ### E. Analysis (pure functions over spans — easiest to test)
+
 17. `analysis/stats.py` → `smells.py` → `diff.py` → `safety.py` → `toolsdiff.py` → `policy.py` → `generations.py` →
     `findings.py` → `gateway_view.py`.
 
 ### F. The server
+
 18. `server/app.py` — one function per URL. Skim the section headers (`# ---- runs`, `# ---- findings`, …).
 19. `cli.py` — the commands and how they map to the pieces above.
 
 ### G. The example
+
 20. `examples/bookshop/bookshop_server.py` (a tiny MCP server), `llm.py`, `agent.py`.
 
 ### H. The UI (after you know the API)
+
 21. `ui/src/main.tsx` → `App.tsx` → `api/client.ts` → `lib/state.tsx` → `components/Layout.tsx`.
 22. `pages/Runs.tsx` → `pages/RunDetail.tsx` → `components/Waterfall.tsx` + `lib/trace.ts` (the tree and timeline maths).
 23. The other pages (`Overview`, `Sessions`, `Servers`, `Findings`, `Gateway`, `MapPage`, `Compare`) all follow the same
     pattern: `useQuery` → API → draw. Their logic is small; read them when you want to see a feature.
 
 ### I. Tests (how each piece is proven)
+
 `tests/test_recorder.py` (the pending table), `test_stdio_proxy.py`, `test_http_proxy.py`, `test_wso2_gateway.py`,
 `test_ingest_and_api.py`, `test_ui_api.py`. A test shows the expected input/output of a file better than prose.
 

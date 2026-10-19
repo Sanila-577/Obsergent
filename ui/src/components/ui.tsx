@@ -6,15 +6,19 @@ import type { Decision, Severity } from "../api/types";
 import { ApiError } from "../api/client";
 import { LAYER_LABEL, type Layer } from "../lib/trace";
 import { splitList } from "../lib/format";
+import { DECISION_WORDS } from "../lib/words";
 
-export function PageHead({ title, sub, children }: { title: string; sub?: ReactNode; children?: ReactNode }) {
+export function PageHead({ title, sub, about, children }: { title: string; sub?: ReactNode; about?: string; children?: ReactNode }) {
   return (
-    <div className="page-head">
-      <h1>{title}</h1>
-      {sub && <span className="sub">{sub}</span>}
-      <div className="grow" />
-      {children}
-    </div>
+    <>
+      <div className="page-head">
+        <h1>{title}</h1>
+        {sub && <span className="sub">{sub}</span>}
+        <div className="grow" />
+        {children}
+      </div>
+      {about && <p className="page-about">{about}</p>}
+    </>
   );
 }
 
@@ -62,7 +66,7 @@ const DECISION_HELP: Record<string, string> = {
 
 export function DecisionBadge({ decision }: { decision: Decision | string | null | undefined }) {
   if (!decision) return <span className="muted">-</span>;
-  return <span className={`badge ${decision}`} title={DECISION_HELP[decision] ?? decision}>{decision}</span>;
+  return <span className={`badge ${decision}`} title={DECISION_HELP[decision] ?? decision}>{DECISION_WORDS[decision] ?? decision}</span>;
 }
 
 export function SeverityBadge({ severity }: { severity: Severity }) {
@@ -87,7 +91,7 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
 
 export function ErrorBox({ error }: { error: unknown }) {
   const message = error instanceof ApiError ? `${error.status}: ${error.message}` : error instanceof Error ? error.message : String(error);
-  return <div className="error-box" role="alert"><strong>Could not load this.</strong> {message}<div className="muted">Is <code>agenttrace up</code> running?</div></div>;
+  return <div className="error-box" role="alert"><strong>Could not load this.</strong> {message}<div className="muted">Is AgentTrace running? Start it with <code>make up</code>.</div></div>;
 }
 
 export function Skeleton({ lines = 3 }: { lines?: number }) {

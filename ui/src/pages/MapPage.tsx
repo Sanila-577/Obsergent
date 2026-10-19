@@ -6,7 +6,9 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { TopologyNode } from "../api/types";
+import { FirstRun } from "../components/FirstRun";
 import { Card, PageHead, QueryState } from "../components/ui";
+import { PAGES } from "../lib/words";
 import { useSettings } from "../lib/state";
 
 type NodeData = { node: TopologyNode };
@@ -52,11 +54,11 @@ export function MapPage() {
 
   return (
     <>
-      <PageHead title="Map" sub="who calls what: click a node to see its runs" />
-      <QueryState query={topology} empty={{ when: (t) => t.nodes.length === 0, title: "No tool calls in this window", hint: <p>Once an app or agent calls tools through the proxy, the map draws itself.</p> }}>
+      <PageHead title={PAGES.map.title} about={PAGES.map.about} />
+      <QueryState query={topology} empty={{ when: (t) => t.nodes.length === 0, title: "No connections yet", hint: <FirstRun kind="map" title="No connections yet" /> }}>
         {() => (
           <Card flush>
-            <div style={{ height: 560 }} aria-label="MCP topology graph">
+            <div style={{ height: 560 }} aria-label="Connections between apps, tool servers and tools">
               <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} fitView minZoom={0.3} nodesDraggable proOptions={{ hideAttribution: true }}
                 onNodeClick={(_, node) => {
                   const { kind, label } = (node.data as NodeData).node;

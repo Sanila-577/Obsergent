@@ -80,6 +80,8 @@ from agenttrace.ingest.otlp import parse_export_json, parse_export_request
 
 # Save spans and remember tool lists.
 from agenttrace.ingest.pipeline import ingest_spans
+from agenttrace.server import price_sync
+from agenttrace.server.costing import CostCalculator, first_question, price_status, spending, trace_cost
 
 # The database interface type.
 from agenttrace.storage.base import Backend
@@ -207,8 +209,13 @@ def create_app(storage: Backend | None = None) -> FastAPI:
             server=server, query=q, decision=decision, since_ns=seconds_to_ns(since), until_ns=seconds_to_ns(until),
             before_ns=before_ns)
         # Attach the number of automatic findings to each run.
-        for trace in traces:  # a count of automatic findings for each run
-            trace["smells_count"] = len(find_smells(store.get_trace(trace["trace_id"])))
+        calculator = CostCalculator(store)
+        for trace in traces:  # a count of automatic findings, the question asked and the cost of each run
+            spans = store.get_trace(trace["trace_id"])
+            trace["smells_count"] = len(find_smells(spans))
+            trace["question"] = first_question(find_generations(spans))
+            trace["cost"] = trace_cost(calculator, spans)
+        calculator.finish()
         return traces
 
     # ONE RUN: all of its spans plus detected smells.
@@ -217,18 +224,25 @@ def create_app(storage: Backend | None = None) -> FastAPI:
     def get_trace(trace_id: str):
         full_id, spans = spans_of(trace_id)
         # Spans converted to dicts (with duration) so FastAPI can send them as JSON.
-        return {"trace_id": full_id,
-                "spans": [asdict(s) | {"duration_ms": s.duration_ms} for s in spans],
-                "smells": find_smells(spans)}
+        calculator = CostCalculator(store)
+        answer = {"trace_id": full_id,
+                  "spans": [asdict(s) | {"duration_ms": s.duration_ms} for s in spans],
+                  "smells": find_smells(spans), "question": first_question(find_generations(spans)),
+                  "cost": trace_cost(calculator, spans)}
+        calculator.finish()
+        return answer
 
     # MODEL CALLS of a run.
     @app.get("/api/traces/{trace_id}/generations")
-    def get_generations(trace_id: str):
+    def get_generations(trace_id: str, reprice: str | None = None):
         """Every model call of the run: messages, tokens, latency, and the MCP call each requested tool led to."""
         full_id, spans = spans_of(trace_id)
         # Pull model-call records out of the spans.
         generations = find_generations(spans)
-        return {"trace_id": full_id, "summary": summarize_generations(generations),
+        calculator = CostCalculator(store, reprice)
+        cost = calculator.attach(generations)  # the cost of each call, and the total
+        calculator.finish()
+        return {"trace_id": full_id, "summary": summarize_generations(generations) | {"cost": cost},
                 "generations": [asdict(g) | {"latency_ms": g.latency_ms} for g in generations]}
 
     # The run as a chat.
@@ -237,7 +251,10 @@ def create_app(storage: Backend | None = None) -> FastAPI:
         """The run as a chat (system, user, assistant, tool); tool calls link to the real MCP call."""
         full_id, spans = spans_of(trace_id)
         generations = find_generations(spans)
-        return {"trace_id": full_id, "summary": summarize_generations(generations),
+        calculator = CostCalculator(store)
+        cost = calculator.attach(generations)
+        calculator.finish()
+        return {"trace_id": full_id, "summary": summarize_generations(generations) | {"cost": cost},
                 "messages": build_conversation(generations)}
 
     # COMPARE two runs.
@@ -254,7 +271,14 @@ def create_app(storage: Backend | None = None) -> FastAPI:
     @app.get("/api/models")
     def list_models():
         """Tokens and latency per model across all recorded runs."""
-        return store.list_model_usage()
+        usage = store.list_model_usage()
+        priced = {(entry["provider"], entry["model"]): entry for entry in
+                  spending(store, None, time.time_ns(), 1, detail=False).get("by_model", [])}
+        for entry in usage:  # add what each model cost (all time)
+            cost = priced.get((entry["provider"] or "", entry["model"]), {})
+            entry["cost_usd"] = cost.get("usd")
+            entry["cost_status"] = cost.get("status")
+        return usage
 
     # --------------------------------------------------------------- sessions
     @app.get("/api/sessions")
@@ -400,7 +424,26 @@ def create_app(storage: Backend | None = None) -> FastAPI:
             "activity": store.activity_series(since, now, buckets),
             "open_findings": len(findings), "open_findings_high": sum(f["severity"] == "high" for f in findings),
             "servers": len(store.list_servers()), "sessions": len(store.list_sessions(500)),
-            "models": store.list_model_usage()}
+            "models": store.list_model_usage(),
+            "cost": spending(store, since, now, 1, detail=False)}
+
+    # ---------------------------------------------------------------- spending and prices
+    # SPENDING page: what the model calls cost in a time window.
+    @app.get("/api/spending")
+    def get_spending(hours: float = DEFAULT_WINDOW_HOURS, buckets: int = Query(24, ge=1, le=96), reprice: str | None = None):
+        """Cost in a window: total, by model, by tool, over time (for the stacked chart) and the most expensive runs."""
+        return spending(store, window_start(hours), time.time_ns(), buckets, reprice)
+
+    # What the "prices checked ... ago" badge and the price-check panel show.
+    @app.get("/api/prices")
+    def get_prices():
+        return price_status(store)
+
+    # "Check now": download the price lists again (no-op when auto refresh is off and nothing is due).
+    @app.post("/api/prices/refresh")
+    def refresh_prices():
+        outcome = price_sync.refresh(store, force=True)
+        return {"outcome": outcome} | price_status(store)
 
     # ---------------------------------------------------------------- findings
     @app.get("/api/findings")

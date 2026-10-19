@@ -186,8 +186,41 @@ CREATE TABLE IF NOT EXISTS finding_acks (
     note             TEXT NOT NULL DEFAULT ''
 );
 """
+# SCHEMA_V5 adds the price lists (what a model costs) and a log of when each list was downloaded.
+SCHEMA_V5 = """
+-- One row per price a source reported for a model. A new row is added only when the price CHANGED, so the table is a
+-- history: the price valid at a given moment is the newest row at or before that moment.
+CREATE TABLE IF NOT EXISTS model_prices (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    -- Who serves the model (openai, anthropic, groq, openrouter ...) and its name there.
+    provider          TEXT NOT NULL,
+    model             TEXT NOT NULL,
+    -- Which public list the price came from: models_dev, openrouter, huggingface, litellm.
+    source            TEXT NOT NULL,
+    -- When AgentTrace first saw this price.
+    effective_from_ns INTEGER NOT NULL,
+    -- Dollars per MILLION tokens; NULL = the list does not say.
+    input             REAL,
+    output            REAL,
+    cache_read        REAL,
+    cache_write       REAL,
+    reasoning         REAL,
+    -- Anything else the list knows (long-context tiers ...), as JSON.
+    extra             TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_prices_model ON model_prices(model, effective_from_ns);
+-- When each list was last downloaded, its ETag (so unchanged lists are not downloaded again) and what went wrong, if anything.
+CREATE TABLE IF NOT EXISTS price_sync (
+    source      TEXT PRIMARY KEY,
+    etag        TEXT NOT NULL DEFAULT '',
+    fetched_ns  INTEGER NOT NULL DEFAULT 0,
+    checked_ns  INTEGER NOT NULL DEFAULT 0,
+    models      INTEGER NOT NULL DEFAULT 0,
+    error       TEXT NOT NULL DEFAULT ''
+);
+"""
 # The list of steps in order. A database file at version N has already had the first N of these applied.
-MIGRATIONS = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4]  # index + 1 = schema version
+MIGRATIONS = [SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5]  # index + 1 = schema version
 
 # Attributes the generic span lookup is allowed to filter on (the name goes into a SQL JSON path, so no free text).
 LOOKUP_ATTRIBUTES = {"gateway.activity_id", "gen_ai.tool.name", "mcp.server.name", "mcp.session.hash",
@@ -408,6 +441,19 @@ class SQLiteStorage:
             rows = db.execute(sql + " ORDER BY start_ns DESC LIMIT ?", [*args, limit]).fetchall()
         return [self.row_to_span(r) for r in rows]
 
+    def list_llm_spans(self, since_ns: int | None = None, limit: int = 20000) -> list[Span]:
+        """Every model call (spans that name a model or are marked LLM and are not MCP traffic), newest first."""
+        sql = ("SELECT * FROM spans WHERE json_extract(attributes, '$.\"mcp.method.name\"') IS NULL AND "
+               "(json_extract(attributes, '$.\"openinference.span.kind\"') = 'LLM' OR "
+               "json_extract(attributes, '$.\"llm.model_name\"') IS NOT NULL)")
+        args: list = []
+        if since_ns is not None:
+            sql += " AND start_ns >= ?"
+            args.append(since_ns)
+        with self.connect() as db:
+            rows = db.execute(sql + " ORDER BY start_ns DESC LIMIT ?", [*args, limit]).fetchall()
+        return [self.row_to_span(r) for r in rows]
+
     def list_calls(self, since_ns: int | None = None, limit: int = 5000) -> list[dict]:
         """Every recorded MCP tool call (proxy spans), newest first, with the facts the dashboards need."""
         # The query: take every span whose method is tools/call and pick out the server, tool, gateway decision and caller;
@@ -524,3 +570,65 @@ class SQLiteStorage:
                 "SELECT server_name, COUNT(*) AS versions, MIN(first_seen_ns) AS first_seen_ns, "
                 "MAX(first_seen_ns) AS last_change_ns FROM tool_snapshots GROUP BY server_name "
                 "ORDER BY server_name")]
+
+    # ------------------------------------------------------------------ prices
+    PRICE_FIELDS = ("input", "output", "cache_read", "cache_write", "reasoning")
+
+    def save_prices(self, source: str, rows: list[dict], now_ns: int) -> int:
+        """Store the prices a source reported; a row is added only when it differs from the newest one stored for the
+        same (provider, model, source). Returns how many rows were added."""
+        with self.connect() as db:
+            # The newest stored price of every (provider, model) of this source.
+            latest = {(r["provider"], r["model"]): r for r in db.execute(
+                "SELECT p.* FROM model_prices p JOIN (SELECT provider, model, MAX(id) AS id FROM model_prices "
+                "WHERE source = ? GROUP BY provider, model) m ON p.id = m.id", (source,))}
+            added = 0
+            for row in rows:
+                old = latest.get((row["provider"], row["model"]))
+                values = [row.get(field) for field in self.PRICE_FIELDS]
+                extra = json.dumps(row.get("extra") or {}, sort_keys=True)
+                # Unchanged price: nothing to store.
+                if old and [old[field] for field in self.PRICE_FIELDS] == values and old["extra"] == extra:
+                    continue
+                db.execute("INSERT INTO model_prices (provider, model, source, effective_from_ns, input, output, "
+                           "cache_read, cache_write, reasoning, extra) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                           (row["provider"], row["model"], source, now_ns, *values, extra))
+                added += 1
+            return added
+
+    def price_rows(self, models: list[str]) -> list[dict]:
+        """The whole price history of these model names (any provider and source), oldest first."""
+        if not models:
+            return []
+        marks = ",".join("?" * len(models))
+        with self.connect() as db:
+            rows = db.execute(f"SELECT * FROM model_prices WHERE model IN ({marks}) ORDER BY effective_from_ns, id",
+                              models).fetchall()
+        return [dict(r) | {"extra": json.loads(r["extra"])} for r in rows]
+
+    def all_current_prices(self) -> list[dict]:
+        """The newest price of every (source, provider, model): used to compare the sources with each other."""
+        with self.connect() as db:
+            rows = db.execute("SELECT p.* FROM model_prices p JOIN (SELECT MAX(id) AS id FROM model_prices "
+                              "GROUP BY source, provider, model) m ON p.id = m.id").fetchall()
+        return [dict(r) | {"extra": json.loads(r["extra"])} for r in rows]
+
+    def save_sync(self, source: str, etag: str, fetched_ns: int, checked_ns: int, models: int, error: str = "") -> None:
+        with self.connect() as db:
+            db.execute("INSERT OR REPLACE INTO price_sync VALUES (?,?,?,?,?,?)",
+                       (source, etag, fetched_ns, checked_ns, models, error))
+
+    def list_sync(self) -> list[dict]:
+        """When each price list was downloaded / checked, with how many models it holds."""
+        with self.connect() as db:
+            return [dict(r) for r in db.execute("SELECT * FROM price_sync ORDER BY source")]
+
+    def price_changes(self, since_ns: int, limit: int = 30) -> list[dict]:
+        """Prices that CHANGED since `since_ns` (a new row after an earlier one for the same source and model), newest first."""
+        sql = ("SELECT n.provider, n.model, n.source, n.effective_from_ns, n.input AS new_input, n.output AS new_output, "
+               "o.input AS old_input, o.output AS old_output FROM model_prices n JOIN model_prices o ON o.id = "
+               "(SELECT MAX(x.id) FROM model_prices x WHERE x.source = n.source AND x.provider = n.provider "
+               "AND x.model = n.model AND x.id < n.id) WHERE n.effective_from_ns >= ? "
+               "AND (n.input IS NOT o.input OR n.output IS NOT o.output) ORDER BY n.effective_from_ns DESC LIMIT ?")
+        with self.connect() as db:
+            return [dict(r) for r in db.execute(sql, (since_ns, limit))]
