@@ -2,7 +2,7 @@
 
 Goal: produce the same kind of trace as Langfuse (Example 3), but with plain
 OpenTelemetry, stored in **your own** tracker from Example 1. This is the
-"inside the agent" half of AgentTrace.
+"inside the agent" half of Obsergent.
 
 ## Files
 

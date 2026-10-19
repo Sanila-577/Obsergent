@@ -1,9 +1,9 @@
-# Using AgentTrace with the WSO2 API Platform MCP gateway
+# Using Obsergent with the WSO2 API Platform MCP gateway
 
 ```
-agent / app  ──►  AgentTrace proxy  ──►  WSO2 gateway (Docker)  ──►  MCP server
+agent / app  ──►  Obsergent proxy  ──►  WSO2 gateway (Docker)  ──►  MCP server
                         │ spans (OTLP/HTTP)         │ spans (OTLP/gRPC)
-                        └───────────►  AgentTrace server  ◄───────┘      → SQLite → Web UI, CLI, API
+                        └───────────►  Obsergent server  ◄───────┘      → SQLite → Web UI, CLI, API
 ```
 
 The gateway is the **WSO2 API Platform** gateway (github.com/wso2/api-platform, its `gateway` folder): a controller plus an Envoy
@@ -12,12 +12,12 @@ router, started with `docker compose`. It has no `bin/` start script (that was t
 > **Status: verified** against gateway 1.2.1 (Docker, October 2026): registration, allowed and refused calls, the
 > gateway's spans joining the agent's trace, and a LangGraph agent running through it. What was observed is in
 > [wso2-findings.md](wso2-findings.md). `docker compose` ports: controller REST 9090, router 8080/8443, admin 9094.
-> The gateway has no web UI of its own: use AgentTrace's UI at http://127.0.0.1:7318.
+> The gateway has no web UI of its own: use Obsergent's UI at http://127.0.0.1:7318.
 
 Commands marked **[gateway repo]** are typed inside the WSO2 repository; the others are run from this repository
 (`make help` lists them; they use the Python environment that is active, or `.venv`). The ports, addresses, the MCP
 server's name and path and the database file are in [config.yaml](../config.yaml) (`gateway:`, `server:`, `proxy:`,
-`bookshop:` sections); `agenttrace config` prints what is in use.
+`bookshop:` sections); `obsergent config` prints what is in use.
 
 ## 1. Get the gateway and set it up (first time only)
 
@@ -27,12 +27,12 @@ cd api-platform/gateway                  # [gateway repo]
 ./scripts/setup.sh                       # [gateway repo] certificates, key, admin password: printed ONCE, copy it
 ```
 
-Then let it send its traces to AgentTrace: append this to `configs/config.toml` [gateway repo]:
+Then let it send its traces to Obsergent: append this to `configs/config.toml` [gateway repo]:
 
 ```toml
 [tracing]
 enabled = true
-endpoint = "host.docker.internal:4317"   # AgentTrace's gRPC receiver, seen from inside Docker
+endpoint = "host.docker.internal:4317"   # Obsergent's gRPC receiver, seen from inside Docker
 insecure = true
 service_version = "1.0.0"
 batch_timeout = "1s"
@@ -46,22 +46,24 @@ sampling_rate = 1.0
 docker compose up                        # [gateway repo] controller REST :9090, router :8080 (-d runs it in the background)
 ```
 ```bash
-make up-grpc                             # AgentTrace + UI (server.port 7318) + gRPC receiver (server.grpc_port 4317) for the gateway's traces
-make mcp-http                            # the Bookshop MCP server the gateway protects (bookshop.http_port 9100)
-export WSO2AP_GW_PASSWORD='<the password setup.sh printed>'
-make register                            # registers it in the gateway: <gateway.router><gateway.mcp_context>/mcp
-make proxy                               # AgentTrace's recording proxy in front of the gateway (proxy.port 7319)
+export WSO2AP_GW_PASSWORD='<the password setup.sh printed>'   # once per terminal; used to register the MCP server in the gateway
+make start                                                    # everything below, detached: you keep the same terminal
+make status                                                   # what is running;  make logs  follows the output
 ```
+
+`make start` = `make up-grpc-bg` (Obsergent + UI + gRPC receiver), `make mcp-http-bg` (the MCP server the gateway protects),
+`make register` (registers it in the gateway), `make proxy-bg` (Obsergent's recording proxy). They run detached with logs in
+`.run/`; `make stop` stops them. Without the `-bg` suffix (`make up-grpc`, `make mcp-http`, `make proxy`) they run in the foreground.
 
 What they do:
 
 | Command | Detail |
 |---|---|
 | `docker compose up` | Starts the controller and the Envoy router from the published 1.2.1 images (building them yourself needs Go 1.25+ and is not required). The gateway has no UI of its own. |
-| `make up-grpc` | stops anything already listening on `server.port` / `server.grpc_port` (such as an earlier `agenttrace up`), then runs `agenttrace up --grpc`; the gateway's `[tracing] endpoint` must point at `server.grpc_port` |
-| `make mcp-http` | `examples/bookshop/bookshop_http.py --host 0.0.0.0`; inside Docker the gateway reaches it as `http://host.docker.internal:9100/mcp` |
+| `make up-grpc-bg` (`make up-grpc` in the foreground) | stops anything already listening on `server.port` / `server.grpc_port` (such as an earlier `obsergent up`), then runs `obsergent up --grpc`; the gateway's `[tracing] endpoint` must point at `server.grpc_port` |
+| `make mcp-http-bg` | `examples/bookshop/bookshop_http.py --host 0.0.0.0`; inside Docker the gateway reaches it as `http://host.docker.internal:9100/mcp` |
 | `make register` | One `POST <gateway.controller>/mcp-proxies` (default `http://localhost:9090/api/management/v1`) with a `kind: Mcp` body (same shape as `gateway/examples/mcp-proxy.yaml`); running it again updates the proxy |
-| `make proxy` | `agenttrace proxy-http` (name, URL and port from `config.yaml`: `--name wso2 --url http://localhost:8080/bookshop/mcp`); clients use `http://127.0.0.1:7319/mcp/wso2` |
+| `make proxy-bg` | `obsergent proxy-http` (name, URL and port from `config.yaml`: `--name wso2 --url http://localhost:8080/bookshop/mcp`); clients use `http://127.0.0.1:7319/mcp/wso2` |
 
 The gateway forwards to **exactly** the upstream URL it was given, so that URL must end in `/mcp` (`make register` does
 this). `make register-deny` adds the `mcp-acl-list` policy (only `search_books` allowed). Other policies (`mcp-auth`,
@@ -90,9 +92,9 @@ forbidden, throttled, denied) and where the gateway spent its time. `make traces
 ## 5. Stop everything and start again from scratch
 
 ```bash
-# Ctrl+C in the terminals of make up-grpc, make mcp-http and make proxy, then:
+make stop                                # stops what make start started
 docker compose down                      # [gateway repo] `down -v` would also forget the registered MCP proxy (then `make register`)
-make reset-db                            # EMPTIES AgentTrace's database; AgentTrace must be stopped first
+make reset-db                            # EMPTIES Obsergent's database; Obsergent must be stopped first
 ```
 
 ## Troubleshooting

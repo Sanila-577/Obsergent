@@ -13,8 +13,8 @@ type Tab = "overview" | "arguments" | "result" | "gateway" | "raw";
 const SHOWN_IN_OVERVIEW: [string, string][] = [
   ["mcp.method.name", "MCP method"], ["gen_ai.tool.name", "Tool"], ["mcp.server.name", "MCP server"],
   ["llm.model_name", "Model"], ["llm.provider", "Provider"], ["llm.token_count.total", "Tokens"],
-  ["agenttrace.caller.application", "Caller application"], ["agenttrace.caller.client_id", "Caller client id"],
-  ["agenttrace.caller.scopes", "Caller scopes"], ["http.response.status_code", "HTTP status"],
+  ["obsergent.caller.application", "Caller application"], ["obsergent.caller.client_id", "Caller client id"],
+  ["obsergent.caller.scopes", "Caller scopes"], ["http.response.status_code", "HTTP status"],
   ["gateway.decision", "Gateway decision"], ["gateway.activity_id", "Gateway activity id"], ["mcp.session.hash", "MCP session"],
 ];
 
@@ -26,7 +26,7 @@ export function SpanInspector({ span, allSpans, runStart }: { span: Span; allSpa
   const tree = useMemo(() => buildTree(allSpans), [allSpans]);
   const node = findNode(tree, span.span_id);
   const phases = node ? phasesBelow(node) : {};
-  const hasGateway = attrs["agenttrace.layer"] === "gateway" || attrs["gateway.decision"] !== undefined;
+  const hasGateway = attrs["obsergent.layer"] === "gateway" || attrs["gateway.decision"] !== undefined;
   const reproduction = reproduceCall(span);
 
   // Arguments / result live under different names depending on who recorded the span.

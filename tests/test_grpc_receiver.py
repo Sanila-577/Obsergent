@@ -4,8 +4,8 @@ import pytest
 from opentelemetry.exporter.otlp.proto.common.trace_encoder import encode_spans
 from opentelemetry.proto.collector.trace.v1 import trace_service_pb2_grpc
 
-from agenttrace.server.grpc_receiver import start_grpc_server
-from agenttrace.storage.sqlite import SQLiteStorage
+from obsergent.server.grpc_receiver import start_grpc_server
+from obsergent.storage.sqlite import SQLiteStorage
 from test_ingest_and_api import make_spans
 
 

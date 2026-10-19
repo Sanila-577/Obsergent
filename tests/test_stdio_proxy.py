@@ -1,4 +1,4 @@
-"""The real stdio proxy, in front of the real bookshop MCP server, sending spans to a live AgentTrace server."""
+"""The real stdio proxy, in front of the real bookshop MCP server, sending spans to a live Obsergent server."""
 import sys
 
 import httpx
@@ -24,7 +24,7 @@ def test_calls_are_recorded_and_answers_pass_through(live_server, bookshop_cmd):
     assert sorted(t["root_name"] for t in traces) == ["initialize", "tools/call search_books", "tools/list"]
     call = next(s for t in traces if t["root_name"] == "tools/call search_books"
                 for s in storage.get_trace(t["trace_id"]))
-    assert call.service == "agenttrace-proxy"
+    assert call.service == "obsergent-proxy"
     assert call.attributes["mcp.tool.arguments"] == '{"api_key": "***", "query": "python"}'  # secret hidden
     assert "Python Crash Course" in call.attributes["mcp.result"]
 

@@ -1,4 +1,4 @@
-"""Two quick measurements: how fast does AgentTrace store spans, and what does the proxy add to a call?
+"""Two quick measurements: how fast does Obsergent store spans, and what does the proxy add to a call?
 
     python scripts/bench.py
 Uses a temporary database and a throwaway server on a free port: your real data is not touched.
@@ -22,8 +22,8 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from agenttrace.server.app import create_app
-from agenttrace.storage.sqlite import SQLiteStorage
+from obsergent.server.app import create_app
+from obsergent.storage.sqlite import SQLiteStorage
 
 BOOKSHOP = Path(__file__).resolve().parent.parent / "examples" / "bookshop" / "bookshop_server.py"
 CALLS = 200
@@ -84,9 +84,9 @@ def bench_proxy(tmp: Path) -> None:
     threading.Thread(target=server.run, daemon=True).start()
     while not server.started:
         time.sleep(0.02)
-    env = dict(os.environ, AGENTTRACE_ENDPOINT=f"http://127.0.0.1:{port}")
+    env = dict(os.environ, OBSERGENT_ENDPOINT=f"http://127.0.0.1:{port}")
     direct_cmd = [sys.executable, str(BOOKSHOP)]
-    proxy_cmd = [sys.executable, "-m", "agenttrace.cli", "proxy", "--name", "bench", "--", *direct_cmd]
+    proxy_cmd = [sys.executable, "-m", "obsergent.cli", "proxy", "--name", "bench", "--", *direct_cmd]
     roundtrip_ms(direct_cmd, env)  # warm-up run: the first process start is always slower
     # Alternate direct/proxied runs and take the median, so noise affects both sides equally.
     runs = [(roundtrip_ms(direct_cmd, env), roundtrip_ms(proxy_cmd, env)) for repeat in range(5)]

@@ -24,7 +24,7 @@ export function Sessions() {
           hint: <FirstRun kind="sessions" title="No app activity yet" /> }}>
           {(rows) => (
             <table>
-              <thead><tr><th>Started<Help topic="session" /></th><th>Tool server</th>{detailed && <th>Command</th>}<th className="num">Requests</th><th className="num">Actions</th><th className="num">Problems</th>{detailed && <th>Session id</th>}</tr></thead>
+              <thead><tr><th>Started<Help topic="session" /></th><th>Tool server</th>{detailed && <th>Command</th>}<th className="num">Requests</th><th className="num">Tools used</th><th className="num">Problems</th>{detailed && <th>Session id</th>}</tr></thead>
               <tbody>{rows.map((s) => (
                 <tr key={s.session_id} className="click" onClick={() => navigate(`/sessions/${s.session_id}`)}>
                   <td className="nowrap">{formatTime(s.start_ns)}<div className="muted" style={{ fontSize: 12 }}>{timeAgo(s.start_ns)}</div></td>

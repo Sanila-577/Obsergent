@@ -8,7 +8,7 @@ function useRemembered<T>(key: string, fallback: T): [T, (value: T) => void] {
   // Read the saved value, or use the default if nothing is saved or storage is blocked.
   const read = (): T => {
     try {
-      const stored = localStorage.getItem(`agenttrace.${key}`);
+      const stored = localStorage.getItem(`obsergent.${key}`);
       return stored === null ? fallback : (JSON.parse(stored) as T);
     } catch {
       return fallback;
@@ -20,7 +20,7 @@ function useRemembered<T>(key: string, fallback: T): [T, (value: T) => void] {
   const save = (next: T) => {
     setValue(next);
     try {
-      localStorage.setItem(`agenttrace.${key}`, JSON.stringify(next));
+      localStorage.setItem(`obsergent.${key}`, JSON.stringify(next));
     } catch {
       /* storage blocked: the setting just won't survive a reload */
     }

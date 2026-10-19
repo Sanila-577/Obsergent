@@ -43,14 +43,14 @@ describe("other formatters", () => {
 });
 
 describe("money", () => {
-  it.each([[0, "$0"], [0.0004, "< 1¢"], [0.42, "$0.42"], [12.5, "$12.50"], [2400, "$2,400"], [null, "-"], [NaN, "-"]])("%s -> %s", (input, expected) => {
+  it.each([[0, "$0"], [0.0004, "$0.00040"], [0.00021, "$0.00021"], [0.0369, "$0.037"], [0.0123, "$0.012"], [0.5, "$0.50"], [0.000001234, "$0.0000012"], [0.42, "$0.42"], [12.5, "$12.50"], [2400, "$2,400"], [null, "-"], [NaN, "-"]])("%s -> %s", (input, expected) => {
     expect(formatMoney(input as number | null)).toBe(expected);
   });
-  it("says amounts in words", () => {
+  it("says amounts in words, always in dollars", () => {
     expect(moneyInWords(0)).toBe("nothing");
-    expect(moneyInWords(0.004)).toBe("less than 1 cent");
-    expect(moneyInWords(0.01)).toBe("1 cent");
-    expect(moneyInWords(0.42)).toBe("42 cents");
+    expect(moneyInWords(0.004)).toBe("$0.0040");
+    expect(moneyInWords(0.01)).toBe("$0.010");
+    expect(moneyInWords(0.42)).toBe("$0.42");
     expect(moneyInWords(3.5)).toBe("$3.50");
     expect(moneyInWords(null)).toBe("an unknown amount");
   });

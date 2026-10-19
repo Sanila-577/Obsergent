@@ -8,9 +8,9 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from agenttrace.server.app import create_app
-from agenttrace.storage.sqlite import MIGRATIONS, SCHEMA_V1, SQLiteStorage
 from conftest import post_spans
+from obsergent.server.app import create_app
+from obsergent.storage.sqlite import MIGRATIONS, SCHEMA_V1, SQLiteStorage
 
 TRACE = "0af7651916cd43dd8448eb211c80319c"
 SPAN = "b7ad6b7169203331"
@@ -42,7 +42,7 @@ def test_otlp_json_bad_hex_is_400(tmp_path):
 
 def tools_span(description, server="demo"):
     mem = InMemorySpanExporter()
-    provider = TracerProvider(resource=Resource.create({"service.name": "agenttrace-proxy", "mcp.server.name": server}))
+    provider = TracerProvider(resource=Resource.create({"service.name": "obsergent-proxy", "mcp.server.name": server}))
     provider.add_span_processor(SimpleSpanProcessor(mem))
     with provider.get_tracer("t").start_as_current_span("tools/list") as s:
         s.set_attribute("mcp.method.name", "tools/list")
@@ -76,3 +76,51 @@ def test_old_v1_database_is_upgraded_without_losing_data(tmp_path):
     old_trace = store.list_traces()[0]
     assert old_trace["trace_id"] == "t1" and old_trace["models"] is None  # old data still there, new columns empty
     assert store.list_sessions() == [] and store.list_servers() == []  # new tables exist and are empty
+
+
+def test_a_database_recorded_under_the_old_name_is_converted(tmp_path):
+    """Schema v6: span keys and the proxy's service name are renamed in place, and the views read the new keys."""
+    import json
+    import sqlite3
+
+    from obsergent.storage import legacy
+    from obsergent.storage.sqlite import SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5
+
+    path = tmp_path / "old.db"
+    db = sqlite3.connect(path)
+    old_key = legacy.KEY_PREFIX.strip('"')  # the old key prefix, without the quote
+    for script in (SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5):
+        db.executescript(script)
+    attributes = {f"{old_key}session.id": "s1", f"{old_key}layer": "gateway", "mcp.method.name": "tools/call",
+                  "mcp.server.name": "bookshop", "note": f"value mentioning {old_key}cli stays as it is"}
+    db.execute("INSERT INTO spans VALUES ('a','t',NULL,'tools/call x','CLIENT',?,1,2,'UNSET','',?,'[]')",
+               (legacy.SERVICE, json.dumps(attributes)))
+    db.execute("PRAGMA user_version = 5")
+    db.commit()
+    db.close()
+
+    store = SQLiteStorage(path)
+    span = store.get_trace("t")[0]
+    assert span.service == "obsergent-proxy"
+    assert span.attributes["obsergent.session.id"] == "s1" and span.attributes["obsergent.layer"] == "gateway"
+    assert old_key + "cli" in span.attributes["note"]  # only JSON keys are renamed, never values
+    assert store.list_sessions()[0]["session_id"] == "s1"  # the sessions view reads the new key
+    assert store.connect().execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
+
+
+def test_the_old_database_is_copied_once_to_the_new_default_location(tmp_path, monkeypatch):
+    import sqlite3
+
+    from obsergent.storage import legacy
+
+    old, new = tmp_path / "old" / "old.db", tmp_path / "new" / "new.db"
+    old.parent.mkdir()
+    db = sqlite3.connect(old)
+    db.execute("CREATE TABLE marker (x)")
+    db.commit()
+    db.close()
+    monkeypatch.setattr(legacy, "DB", old)
+    monkeypatch.setattr(legacy, "NEW_DEFAULT_DB", new)
+    assert legacy.copy_old_database(new) is True and new.exists() and old.exists()  # copied, old file kept
+    assert legacy.copy_old_database(new) is False  # never again
+    assert legacy.copy_old_database(tmp_path / "other.db") is False  # only the default location

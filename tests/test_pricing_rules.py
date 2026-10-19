@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from agenttrace.analysis.pricing import Price, cost_of_call, price_call
-from agenttrace.server import price_sync
+from obsergent.analysis.pricing import Price, cost_of_call, price_call
+from obsergent.server import price_sync
 
 FIXTURES = Path(__file__).parent / "fixtures" / "prices"
 

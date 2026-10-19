@@ -4,7 +4,7 @@ import types
 import pytest
 from opentelemetry.sdk.trace import TracerProvider
 
-from agenttrace.sdk import setup
+from obsergent.sdk import setup
 
 
 def test_unknown_framework_is_rejected():
@@ -15,7 +15,7 @@ def test_unknown_framework_is_rejected():
 def test_missing_extra_is_an_error_only_when_requested(monkeypatch):
     monkeypatch.setitem(setup.INSTRUMENTORS, "ghost", ("module_that_does_not_exist", "GhostInstrumentor"))
     assert setup.instrument_framework("ghost", TracerProvider(), required=False) is False  # silently skipped
-    with pytest.raises(RuntimeError, match=r"agenttrace\[ghost\]"):
+    with pytest.raises(RuntimeError, match=r"obsergent\[ghost\]"):
         setup.instrument_framework("ghost", TracerProvider(), required=True)
 
 

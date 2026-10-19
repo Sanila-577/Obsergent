@@ -1,13 +1,13 @@
-from agenttrace.analysis.diff import first_divergence
-from agenttrace.analysis.safety import (
+from obsergent.analysis.diff import first_divergence
+from obsergent.analysis.safety import (
     description_drift,
     drift_report,
     injection_findings,
     risky_tools,
     tool_set_changes,
 )
-from agenttrace.analysis.smells import find_smells
-from agenttrace.models import Span
+from obsergent.analysis.smells import find_smells
+from obsergent.models import Span
 
 
 def call(tool, args, t, status="UNSET", dur=1):

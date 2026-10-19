@@ -16,7 +16,7 @@ from bookshop_server import mcp
 from mcp.server.transport_security import TransportSecuritySettings
 
 # config.yaml: the default port.
-from agenttrace import config
+from obsergent import config
 
 # Describe the options.
 parser = argparse.ArgumentParser(description="Bookshop MCP server over Streamable HTTP")

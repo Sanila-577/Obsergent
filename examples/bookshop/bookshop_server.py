@@ -1,6 +1,6 @@
 """bookshop_server.py - a small custom MCP server with two tools (the demo server).
 
-AgentTrace's proxy starts this file for the agent, so you never run it by hand.
+Obsergent's proxy starts this file for the agent, so you never run it by hand.
 (Run it alone to see it wait on stdin/stdout: `python bookshop_server.py`.)
 Nothing here knows about tracing: the proxy records everything from outside.
 """

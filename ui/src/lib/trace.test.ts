@@ -12,8 +12,8 @@ function span(partial: Partial<Span> & { attributes?: Span["attributes"] }): Spa
 
 describe("layerOf", () => {
   it("recognises each part of the system", () => {
-    expect(layerOf(span({ attributes: { "agenttrace.layer": "gateway" } }))).toBe("gateway");
-    expect(layerOf(span({ service: "agenttrace-proxy" }))).toBe("proxy");
+    expect(layerOf(span({ attributes: { "obsergent.layer": "gateway" } }))).toBe("gateway");
+    expect(layerOf(span({ service: "obsergent-proxy" }))).toBe("proxy");
     expect(layerOf(span({ attributes: { "mcp.method.name": "tools/call" } }))).toBe("proxy");
     expect(layerOf(span({ attributes: { "openinference.span.kind": "LLM" } }))).toBe("model");
     expect(layerOf(span({ attributes: { "openinference.span.kind": "CHAIN" } }))).toBe("agent");

@@ -1,39 +1,39 @@
-# AgentTrace settings: every port, address and path in one place.
+# Obsergent settings: every port, address and path in one place.
 #
-# Read by src/agenttrace/config.py (functions such as config.port(), config.db_path()), by the Makefile
-# (through `agenttrace config <key>`) and by the scripts. To change a value, edit it here.
+# Read by src/obsergent/config.py (functions such as config.port(), config.db_path()), by the Makefile
+# (through `obsergent config <key>`) and by the scripts. To change a value, edit it here.
 # An environment variable with the name shown in [brackets] overrides the value for one run, for example
-#       AGENTTRACE_PORT=7390 agenttrace up
+#       OBSERGENT_PORT=7390 obsergent up
 # Secrets are NOT stored here: the model's API keys go in .env, the gateway password in WSO2AP_GW_PASSWORD.
 #
-# Another file can be used with AGENTTRACE_CONFIG=/path/to/config.yaml
+# Another file can be used with OBSERGENT_CONFIG=/path/to/config.yaml
 
-# The AgentTrace server: the web UI, the REST API and the span receivers.
+# The Obsergent server: the web UI, the REST API and the span receivers.
 server:
-  host: 127.0.0.1        # [AGENTTRACE_HOST] 127.0.0.1 = this machine only (nothing is exposed to the network)
-  port: 7318             # [AGENTTRACE_PORT] web UI, REST API and OTLP/HTTP (POST /v1/traces)
-  grpc_port: 4317        # [AGENTTRACE_GRPC_PORT] OTLP/gRPC, used by `agenttrace up --grpc` (the WSO2 gateway sends here)
-  endpoint: ""           # [AGENTTRACE_ENDPOINT] where SDKs and proxies SEND spans; empty = http://<host>:<port>
+  host: 127.0.0.1        # [OBSERGENT_HOST] 127.0.0.1 = this machine only (nothing is exposed to the network)
+  port: 7318             # [OBSERGENT_PORT] web UI, REST API and OTLP/HTTP (POST /v1/traces)
+  grpc_port: 4317        # [OBSERGENT_GRPC_PORT] OTLP/gRPC, used by `obsergent up --grpc` (the WSO2 gateway sends here)
+  endpoint: ""           # [OBSERGENT_ENDPOINT] where SDKs and proxies SEND spans; empty = http://<host>:<port>
 
 # Where everything recorded is stored (one SQLite file). ~ means your home folder.
 storage:
-  path: ~/.agenttrace/agenttrace.db     # [AGENTTRACE_DB]
+  path: ~/.obsergent/obsergent.db     # [OBSERGENT_DB]
 
 # What is recorded.
 recording:
-  max_attr_chars: 4000   # [AGENTTRACE_MAX_ATTR_CHARS] longer arguments / results are cut to this many characters
+  max_attr_chars: 4000   # [OBSERGENT_MAX_ATTR_CHARS] longer arguments / results are cut to this many characters
 
-# `agenttrace proxy-http`: the recording proxy in front of a remote MCP server or a gateway.
+# `obsergent proxy-http`: the recording proxy in front of a remote MCP server or a gateway.
 proxy:
   host: 127.0.0.1
-  port: 7319             # [AGENTTRACE_PROXY_PORT]
+  port: 7319             # [OBSERGENT_PROXY_PORT]
 
 # The WSO2 API Platform gateway (its own repository, started with docker compose).
 gateway:
   router: http://localhost:8080                            # [GATEWAY_ROUTER] where MCP traffic goes
   controller: http://localhost:9090/api/management/v1      # [GATEWAY_CONTROLLER] where `make register` registers the MCP server
   username: admin                                          # [WSO2AP_GW_USERNAME] (the password: WSO2AP_GW_PASSWORD, never here)
-  mcp_name: wso2                                           # name of the proxy in AgentTrace: http://<proxy>/mcp/<mcp_name>
+  mcp_name: wso2                                           # name of the proxy in Obsergent: http://<proxy>/mcp/<mcp_name>
   mcp_context: /bookshop                                   # path of the MCP server in the gateway: <router>/bookshop/mcp
 
 # The example MCP server over HTTP (examples/bookshop/bookshop_http.py), which the gateway protects.
@@ -43,8 +43,8 @@ bookshop:
 # What a model call costs. Prices are downloaded automatically from public price lists (nothing of yours is sent) and
 # kept in the database with their history; the cost is calculated each time it is shown, from the recorded token counts.
 pricing:
-  enabled: true          # [AGENTTRACE_PRICING] false = no costs at all
-  auto_refresh: true     # [AGENTTRACE_PRICING_AUTO_REFRESH] false = never download (the only outbound call AgentTrace makes)
+  enabled: true          # [OBSERGENT_PRICING] false = no costs at all
+  auto_refresh: true     # [OBSERGENT_PRICING_AUTO_REFRESH] false = never download (the only outbound call Obsergent makes)
   refresh_minutes:       # how often each list is checked for changes (the live ones more often; a check costs a few hundred bytes)
     openrouter: 30
     huggingface: 30
@@ -52,7 +52,7 @@ pricing:
     litellm: 120
   exact_from_provider: true   # use the cost OpenRouter and xAI send with every response instead of an estimate
   credits_per_usd: 1          # OpenRouter reports credits; 1 credit = 1 US dollar (checked against its Activity page)
-  reprice: call_time     # [AGENTTRACE_PRICING_REPRICE] call_time = the price valid when the call was made; now = today's price
+  reprice: call_time     # [OBSERGENT_PRICING_REPRICE] call_time = the price valid when the call was made; now = today's price
   sources:               # the public price lists, in the order they are consulted (see docs/costs.md)
     models_dev: https://models.dev/api.json
     openrouter: https://openrouter.ai/api/v1/models

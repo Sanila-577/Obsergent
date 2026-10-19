@@ -1,4 +1,4 @@
-from agenttrace.proxy.redact import redact, safe_command, to_attr
+from obsergent.proxy.redact import redact, safe_command, to_attr
 
 
 def test_secret_keys_are_hidden_even_when_nested():

@@ -1,7 +1,7 @@
-# How AgentTrace calculates what a model call costs
+# How Obsergent calculates what a model call costs
 
 **An estimate, never a bill.** It is the recorded number of words (tokens) times the model's price per word. The price comes
-from public price lists that AgentTrace downloads and re-checks by itself. Nothing is typed in by hand.
+from public price lists that Obsergent downloads and re-checks by itself. Nothing is typed in by hand.
 
 ## What costs money, and what does not
 
@@ -10,7 +10,7 @@ from public price lists that AgentTrace downloads and re-checks by itself. Nothi
 | A model call (hosted: OpenAI, Anthropic, Groq, OpenRouter, Hugging Face ...) | **yes**: tokens in and out, cheaper for cached tokens                                                                                                                                                                                |
 | A model on your own computer (Ollama, LM Studio, vLLM)                       | **$0 per call**, shown as "free". (Electricity and hardware are not counted.)                                                                                                                                                        |
 | An MCP call itself                                                           | none: MCP is an open protocol. A hosted, commercial MCP server may charge per call, but no price list exists for that, so it is not counted                                                                                                |
-| The WSO2 gateway                                                             | none from AgentTrace's point of view: it is open source; you pay for the machine it runs on                                                                                                                                                |
+| The WSO2 gateway                                                             | none from Obsergent's point of view: it is open source; you pay for the machine it runs on                                                                                                                                                |
 | Tools' hidden cost                                                           | **yes, and often the biggest part**: every model call carries all tool descriptions in its prompt, and every tool result is fed back to the model. The **By action** view shows what the model spent deciding to use each tool |
 
 ## Exact costs: when the provider tells us
@@ -33,12 +33,12 @@ the OpenInference tracer records the model result as the span's `output.value`, 
 when the span arrives. It recognises the provider by the SHAPE of the usage (the span says "openai" for OpenRouter and xAI too),
 and stores it as `llm.cost.total`. **Streaming:** the charge is only in the last chunk; a call whose recorded response lacks it
 falls back to the estimate. `pricing.exact_from_provider: false` shows estimates for everything.
-OpenRouter **bring-your-own-key** calls also record what your own provider charged (`agenttrace.cost.upstream_usd`).
+OpenRouter **bring-your-own-key** calls also record what your own provider charged (`obsergent.cost.upstream_usd`).
 
 ## Where prices come from (for everything that is estimated)
 
 There is **no official, real-time price feed**: providers publish prices on web pages, and their `/v1/models` endpoints need a key.
-So AgentTrace reads four public lists (plain GET requests, no key, nothing of yours is sent):
+So Obsergent reads four public lists (plain GET requests, no key, nothing of yours is sent):
 
 | List | Address | Covers | Unit |
 |---|---|---|---|
@@ -47,7 +47,7 @@ So AgentTrace reads four public lists (plain GET requests, no key, nothing of yo
 | Hugging Face router | `https://router.huggingface.co/v1/models` | the models served through Hugging Face (live), per provider | $ per million tokens |
 | [LiteLLM cost map](https://docs.litellm.ai/docs/proxy/custom_model_cost_map) | `https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json` | about 4,200 entries; **also** batch/flex/priority prices, long-prompt tiers, 1-hour cache price, search fees | $ per token |
 
-(LiteLLM is an open-source library and AI gateway; AgentTrace does **not** run it, it only reads that one public JSON file.)
+(LiteLLM is an open-source library and AI gateway; Obsergent does **not** run it, it only reads that one public JSON file.)
 
 ## When prices update, and how real-time it is
 
@@ -55,10 +55,10 @@ So AgentTrace reads four public lists (plain GET requests, no key, nothing of yo
 * **Estimated costs follow the lists:** OpenRouter and Hugging Face publish live and are checked **every 30 minutes**; models.dev and
   LiteLLM are edited by people several times a day and are checked **every 2 hours** (`pricing.refresh_minutes` in `config.yaml`).
   A check sends the stored ETag, so an unchanged list answers "304 Not Modified" (a few hundred bytes). Checks happen while
-  AgentTrace runs, once at start-up, once more (at most hourly) when a call arrives for a model with no price, and on **Check now**
+  Obsergent runs, once at start-up, once more (at most hourly) when a call arrives for a model with no price, and on **Check now**
   (`make prices`). If a download fails, the last prices stay and the Spending page says so.
 * **Worst case lag** = the list's own update delay + our interval. A call made between a provider's change and our next check uses
-  the old price; the price history records when AgentTrace first saw each price.
+  the old price; the price history records when Obsergent first saw each price.
 * **Costs on screen** are recalculated every time they are shown; the UI refreshes every 2 seconds in Live mode, otherwise when you
   open or reload a page. A banner on the Spending page lists price changes of the last two weeks.
 
@@ -72,7 +72,7 @@ So AgentTrace reads four public lists (plain GET requests, no key, nothing of yo
 5. `pricing.overrides` in `config.yaml` (empty by default) beats everything.
 
 The mark next to an estimate: **✓** two or more lists agree, **≈** they disagree a little (hover for the range), nothing: one list only.
-`agenttrace prices show <model> --provider <p>` prints the price and the mark.
+`obsergent prices show <model> --provider <p>` prints the price and the mark.
 
 ## The formula (estimates)
 
@@ -109,7 +109,7 @@ published rules and documented examples).
 Nothing is frozen except the provider's own charge: every estimate is calculated when shown, from the recorded tokens and the price
 table, so a refreshed price changes the numbers at once. The price table keeps a history (a new row only when a price changes) and by
 default each call is priced with the price **valid when it was made**. `pricing.reprice: now` (or `?reprice=now`) uses today's prices.
-A call older than the first price AgentTrace saw for that model uses the oldest known price.
+A call older than the first price Obsergent saw for that model uses the oldest known price.
 
 ## Turning it off
 

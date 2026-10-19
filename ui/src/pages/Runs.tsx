@@ -106,7 +106,7 @@ export function Runs() {
       <div className="card" style={{ marginBottom: 14 }}>
         <div className="row wrap">
           <input type="search" placeholder="Search conversations…" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search" />
-          <input list="tool-list" placeholder="Action (tool)" value={params.get("tool") ?? ""} onChange={(e) => setParam("tool", e.target.value || null)} aria-label="Action" style={{ width: 150 }} />
+          <input list="tool-list" placeholder="Tool" value={params.get("tool") ?? ""} onChange={(e) => setParam("tool", e.target.value || null)} aria-label="Tool" style={{ width: 150 }} />
           <datalist id="tool-list">{(tools.data ?? []).map((t) => <option key={`${t.server}${t.tool}`} value={String(t.tool)} />)}</datalist>
           {detailed && <input list="server-list" placeholder="Server" value={params.get("server") ?? ""} onChange={(e) => setParam("server", e.target.value || null)} aria-label="Server" style={{ width: 140 }} />}
           <datalist id="server-list">{[...new Set((tools.data ?? []).map((t) => t.server).filter(Boolean))].map((s) => <option key={s} value={String(s)} />)}</datalist>
@@ -130,7 +130,7 @@ export function Runs() {
           : rows.length === 0 ? (filtered ? <EmptyState title="No conversations match these filters"><p>Try clearing a filter.</p></EmptyState> : <FirstRun kind="runs" />)
           : (
             <table>
-              <thead><tr><th style={{ width: 28 }} /><th>When</th><th>Conversation</th><th className="num">Duration</th><th className="num">Cost</th><th className="num">Actions<Help topic="action" /></th><th className="num">Problems</th>{detailed && <th className="num">To check</th>}<th>Gateway</th><th>Model</th>{detailed && <th>Services</th>}</tr></thead>
+              <thead><tr><th style={{ width: 28 }} /><th>When</th><th>Conversation</th><th className="num">Duration</th><th className="num">Cost</th><th className="num">Tools<Help topic="tool" /></th><th className="num">Problems</th>{detailed && <th className="num">To check</th>}<th>Gateway</th><th>Model</th>{detailed && <th>Services</th>}</tr></thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.trace_id} className={`click${picked.includes(r.trace_id) ? " selected" : ""}`} onClick={() => navigate(`/runs/${r.trace_id}`)}>

@@ -1,13 +1,13 @@
 """config.py: settings come from config.yaml through functions; environment variables win; defaults fill the gaps."""
 import pytest
 
-from agenttrace import config
+from obsergent import config
 
 
 @pytest.fixture(autouse=True)
 def fresh_config(monkeypatch):
-    """Each test starts with no AGENTTRACE_* overrides and re-reads the config file afterwards."""
-    for variable in set(config.ENVIRONMENT.values()) | {"AGENTTRACE_CONFIG"}:
+    """Each test starts with no OBSERGENT_* overrides and re-reads the config file afterwards."""
+    for variable in set(config.ENVIRONMENT.values()) | {"OBSERGENT_CONFIG"}:
         monkeypatch.delenv(variable, raising=False)
     config.reload()
     yield
@@ -17,7 +17,7 @@ def fresh_config(monkeypatch):
 def use_file(monkeypatch, tmp_path, text):
     path = tmp_path / "config.yaml"
     path.write_text(text)
-    monkeypatch.setenv("AGENTTRACE_CONFIG", str(path))
+    monkeypatch.setenv("OBSERGENT_CONFIG", str(path))
     config.reload()
 
 
@@ -41,7 +41,7 @@ def test_a_key_missing_from_the_file_falls_back_to_the_default(monkeypatch, tmp_
 
 def test_environment_variables_win_over_the_file(monkeypatch, tmp_path):
     use_file(monkeypatch, tmp_path, "server:\n  port: 8123\n")
-    monkeypatch.setenv("AGENTTRACE_PORT", "9999")
+    monkeypatch.setenv("OBSERGENT_PORT", "9999")
     assert config.port() == 9999
 
 
@@ -64,7 +64,7 @@ def test_the_password_is_only_read_from_the_environment(monkeypatch, tmp_path):
 
 
 def test_a_named_file_that_does_not_exist_is_an_error(monkeypatch, tmp_path):
-    monkeypatch.setenv("AGENTTRACE_CONFIG", str(tmp_path / "missing.yaml"))
+    monkeypatch.setenv("OBSERGENT_CONFIG", str(tmp_path / "missing.yaml"))
     config.reload()
     with pytest.raises(FileNotFoundError):
         config.load()
@@ -77,9 +77,9 @@ def test_pricing_settings_have_defaults_and_the_environment_wins(monkeypatch):
     assert config.pricing_reprice() == "call_time"
     assert set(config.pricing_sources()) == {"models_dev", "openrouter", "huggingface", "litellm"}
     assert "ollama" in config.pricing_local_providers() and config.pricing_overrides() == {}
-    monkeypatch.setenv("AGENTTRACE_PRICING_AUTO_REFRESH", "false")
-    monkeypatch.setenv("AGENTTRACE_PRICING_REPRICE", "NOW")
-    monkeypatch.setenv("AGENTTRACE_PRICING", "0")
+    monkeypatch.setenv("OBSERGENT_PRICING_AUTO_REFRESH", "false")
+    monkeypatch.setenv("OBSERGENT_PRICING_REPRICE", "NOW")
+    monkeypatch.setenv("OBSERGENT_PRICING", "0")
     assert not config.pricing_auto_refresh() and config.pricing_reprice() == "now" and not config.pricing_enabled()
 
 

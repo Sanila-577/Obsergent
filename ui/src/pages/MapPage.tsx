@@ -1,75 +1,84 @@
-// The MCP map: who calls which server, and which tools each server serves. Click a node to see its runs.
-import { Background, Controls, Handle, MarkerType, Position, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
+// Connections: who uses which MCP server. Layers from left to right: apps and agents, the gateway (when there is one), MCP servers.
+// A server's tools are hidden until you open them, so the picture stays readable. Hover follows a path; click shows details.
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import type { TopologyNode } from "../api/types";
+import type { Topology, TopologyNode } from "../api/types";
 import { FirstRun } from "../components/FirstRun";
+import { FlowGraph, type FlowEdgeInfo, type FlowNodeInfo } from "../components/FlowGraph";
 import { Card, PageHead, QueryState } from "../components/ui";
-import { PAGES } from "../lib/words";
 import { useSettings } from "../lib/state";
+import { PAGES } from "../lib/words";
 
-type NodeData = { node: TopologyNode };
+const KIND_WORDS: Record<string, string> = { client: "app or agent", gateway: "gateway", server: "MCP server", tool: "tool" };
 
-function MapNode({ data }: NodeProps<Node<NodeData>>) {
-  const { node } = data;
+// Turn the API's nodes and edges into boxes and arrows.
+export function topologyParts(data: Topology): { nodes: FlowNodeInfo[]; edges: FlowEdgeInfo[] } {
+  const nodes = data.nodes.map<FlowNodeInfo>((node) => ({
+    id: node.id, kind: node.kind, label: node.label, badge: node.kind === "server" && node.via_gateway ? "via gateway" : undefined,
+    sub: node.kind === "server" && node.tool_count ? `${node.tool_count} tool${node.tool_count === 1 ? "" : "s"} used` : undefined,
+  }));
+  const edges = data.edges.map<FlowEdgeInfo>((edge) => ({
+    source: edge.source, target: edge.target, calls: edge.calls, errors: edge.errors,
+    label: `${edge.calls} call${edge.calls === 1 ? "" : "s"}${edge.errors ? ` · ${edge.errors} failed` : ""}`,
+  }));
+  return { nodes, edges };
+}
+
+function Panel({ node, data, expanded, onToggle, onClose }: { node: TopologyNode; data: Topology; expanded: boolean; onToggle: () => void; onClose: () => void }) {
+  const calls = data.edges.filter((e) => e.target === node.id).reduce((sum, e) => sum + e.calls, 0)
+    || data.edges.filter((e) => e.source === node.id).reduce((sum, e) => sum + e.calls, 0);
+  const errors = data.edges.filter((e) => e.target === node.id || e.source === node.id).reduce((sum, e) => sum + e.errors, 0);
   return (
-    <div className={`map-node ${node.kind}`}>
-      <Handle type="target" position={Position.Left} /><small>{node.kind === "client" ? "app / agent" : node.kind}</small>
-      <strong>{node.label}</strong>{node.via_gateway && <span className="badge gateway" style={{ marginLeft: 6 }}>via gateway</span>}
-      <Handle type="source" position={Position.Right} />
-    </div>
+    <aside className="flow-panel" aria-label={`Details of ${node.label}`}>
+      <div className="row spread"><span className="badge outline">{KIND_WORDS[node.kind]}</span><button className="small ghost" onClick={onClose}>Close</button></div>
+      <h2 style={{ marginTop: 8 }}>{node.label}</h2>
+      <p className="muted">{calls} call{calls === 1 ? "" : "s"} through here{errors ? `, ${errors} failed` : ""}.</p>
+      {node.kind === "server" && (
+        <p className="col" style={{ gap: 8 }}>
+          {(node.tool_count ?? 0) > 0 && <button onClick={onToggle}>{expanded ? "Hide its tools" : `Show its ${node.tool_count} tool${node.tool_count === 1 ? "" : "s"}`}</button>}
+          <Link className="btn" to={`/mcps?server=${encodeURIComponent(node.label)}`}>Open the MCP page →</Link>
+          <Link className="btn" to={`/runs?server=${encodeURIComponent(node.label)}`}>See its activity →</Link>
+        </p>
+      )}
+      {node.kind === "client" && <p className="col" style={{ gap: 8 }}><Link className="btn" to={`/agents?agent=${encodeURIComponent(node.label)}`}>Open the agent →</Link><Link className="btn" to={`/runs?q=${encodeURIComponent(node.label)}`}>See its activity →</Link></p>}
+      {node.kind === "gateway" && <p><Link className="btn" to="/gateway">Open the gateway page →</Link></p>}
+      {node.kind === "tool" && <p><Link className="btn" to={`/mcps?tool=${encodeURIComponent(node.label)}`}>About this tool →</Link></p>}
+    </aside>
   );
 }
 
-const nodeTypes = { map: MapNode };
-const COLUMN: Record<TopologyNode["kind"], number> = { client: 0, server: 1, tool: 2 };
-
 export function MapPage() {
   const { hours } = useSettings();
-  const navigate = useNavigate();
-  const topology = useQuery({ queryKey: ["topology", hours], queryFn: () => api.topology(hours) });
-
-  const { nodes, edges } = useMemo(() => {
-    const data = topology.data;
-    if (!data) return { nodes: [] as Node<NodeData>[], edges: [] as Edge[] };
-    const rowOf: Record<string, number> = { client: 0, server: 0, tool: 0 };
-    const nodes = data.nodes.map<Node<NodeData>>((node) => ({
-      id: node.id, type: "map", position: { x: COLUMN[node.kind] * 330, y: rowOf[node.kind]++ * 96 }, data: { node },
-    }));
-    const edges = data.edges.map<Edge>((edge) => {
-      const colour = edge.errors ? "#f87171" : "#38bdf8"; // marker colours must be real colours, not CSS variables
-      return {
-        id: `${edge.source}->${edge.target}`, source: edge.source, target: edge.target,
-        label: `${edge.calls} call${edge.calls === 1 ? "" : "s"}${edge.errors ? ` · ${edge.errors} failed` : ""}`,
-        markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: colour },
-        style: { stroke: colour, strokeWidth: 1.2 + Math.min(2.2, Math.log10(edge.calls + 1)) }, // thicker = more traffic
-        labelStyle: { fill: "var(--text)", fontSize: 11 }, labelBgStyle: { fill: "var(--panel)" }, labelBgPadding: [6, 3],
-      };
-    });
-    return { nodes, edges };
-  }, [topology.data]);
+  const [expand, setExpand] = useState<string[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const topology = useQuery({ queryKey: ["topology", hours, expand], queryFn: () => api.topology(hours, expand.join(",")), placeholderData: (previous) => previous });
+  const parts = useMemo(() => (topology.data ? topologyParts(topology.data) : { nodes: [], edges: [] }), [topology.data]);
+  const roots = useMemo(() => (topology.data?.nodes ?? []).filter((n) => n.kind === "client").map((n) => n.id), [topology.data]);
 
   return (
     <>
-      <PageHead title={PAGES.map.title} about={PAGES.map.about} />
-      <QueryState query={topology} empty={{ when: (t) => t.nodes.length === 0, title: "No connections yet", hint: <FirstRun kind="map" title="No connections yet" /> }}>
-        {() => (
-          <Card flush>
-            <div style={{ height: 560 }} aria-label="Connections between apps, tool servers and tools">
-              <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} fitView minZoom={0.3} nodesDraggable proOptions={{ hideAttribution: true }}
-                onNodeClick={(_, node) => {
-                  const { kind, label } = (node.data as NodeData).node;
-                  if (kind === "server") navigate(`/runs?server=${label}`);
-                  else if (kind === "tool") navigate(`/runs?tool=${label}`);
-                }}>
-                <Background gap={22} color="var(--border)" /><Controls showInteractive={false} />
-              </ReactFlow>
-            </div>
-          </Card>
+      <PageHead title={PAGES.map.title} about={PAGES.map.about}>
+        {topology.data && topology.data.nodes.some((n) => n.kind === "server" && (n.tool_count ?? 0) > 0) && (
+          <button onClick={() => setExpand(expand.length ? [] : ["*"])}>{expand.length ? "Hide all tools" : "Show all tools"}</button>
         )}
+      </PageHead>
+      <QueryState query={topology} empty={{ when: (t) => t.nodes.length === 0, title: "No connections yet", hint: <FirstRun kind="map" title="No connections yet" /> }}>
+        {(data) => {
+          const selected = data.nodes.find((n) => n.id === selectedId) ?? null;
+          return (
+            <Card>
+              <div className="flow-layout">
+                <FlowGraph nodes={parts.nodes} edges={parts.edges} roots={roots} last={[]} kindLabels={KIND_WORDS} selectedId={selected?.id ?? null}
+                  onSelect={setSelectedId} ariaLabel="Connections between apps, the gateway and MCP servers" height={500} columnGap={270}
+                  legend={<><span><i className="swatch client" /> app or agent</span><span><i className="swatch gateway" /> gateway</span><span><i className="swatch server" /> MCP server</span><span><i className="swatch tool" /> tool</span><span className="muted">thicker arrow = more calls · hover a box to follow its path</span></>} />
+                {selected && <Panel node={selected} data={data} expanded={expand.includes("*") || expand.includes(selected.label)} onClose={() => setSelectedId(null)}
+                  onToggle={() => setExpand((now) => (now.includes(selected.label) ? now.filter((n) => n !== selected.label) : [...now.filter((n) => n !== "*"), selected.label]))} />}
+              </div>
+            </Card>
+          );
+        }}
       </QueryState>
     </>
   );

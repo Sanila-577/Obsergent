@@ -1,6 +1,6 @@
 """End to end with a REAL model: the bookshop agent -> SDK + proxy -> live server -> API.
 
-Runs only when Ollama is running with the model (default qwen2.5:7b, or AGENTTRACE_TEST_MODEL), otherwise it is skipped.
+Runs only when Ollama is running with the model (default qwen2.5:7b, or OBSERGENT_TEST_MODEL), otherwise it is skipped.
 It forces Ollama for the agent, so a paid provider chosen in .env is never called by the tests.
 Nothing is scripted: the model decides which tools to call, so the checks are about what must be true of ANY run.
 """
@@ -17,7 +17,7 @@ from conftest import BOOKSHOP
 AGENT_DIR = BOOKSHOP.parent
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 # This test always uses a local Ollama model, whatever .env says (your .env may point at a paid service).
-MODEL = os.environ.get("AGENTTRACE_TEST_MODEL", "qwen2.5:7b")
+MODEL = os.environ.get("OBSERGENT_TEST_MODEL", "qwen2.5:7b")
 
 
 def ollama_has_model() -> bool:
@@ -29,7 +29,7 @@ def ollama_has_model() -> bool:
 
 
 def run_agent(endpoint: str, question: str = "Do you have a Python book in stock, and how much is it?") -> str:
-    env = dict(os.environ, AGENTTRACE_ENDPOINT=endpoint, LLM_PROVIDER="ollama", LLM_MODEL=MODEL)
+    env = dict(os.environ, OBSERGENT_ENDPOINT=endpoint, LLM_PROVIDER="ollama", LLM_MODEL=MODEL)
     for name in ("MCP_PROXY_TRACEPARENT", "TRACEPARENT"):
         env.pop(name, None)
     done = subprocess.run([sys.executable, "agent.py", question], cwd=AGENT_DIR, env=env, capture_output=True,
@@ -63,4 +63,4 @@ def test_real_agent_run_is_recorded_end_to_end(live_server):
     assert asked["link"]["mcp_span_id"]  # the model's request is linked to the real MCP call
     detail = httpx.get(f"{url}/api/traces/{run['trace_id']}").json()
     mcp = next(s for s in detail["spans"] if s["span_id"] == asked["link"]["mcp_span_id"])
-    assert mcp["service"] == "agenttrace-proxy" and mcp["attributes"]["gen_ai.tool.name"] == asked["name"]
+    assert mcp["service"] == "obsergent-proxy" and mcp["attributes"]["gen_ai.tool.name"] == asked["name"]

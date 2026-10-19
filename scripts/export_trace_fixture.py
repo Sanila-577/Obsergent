@@ -1,6 +1,6 @@
 """Export one recorded trace as a JSON fixture for tests (home folder paths are anonymised).
 
-    AGENTTRACE_DB=/path/to/agenttrace.db python scripts/export_trace_fixture.py <trace id prefix> [<prefix> ...] \\
+    OBSERGENT_DB=/path/to/obsergent.db python scripts/export_trace_fixture.py <trace id prefix> [<prefix> ...] \\
         tests/fixtures/run.json
 (the last argument is the output file; several traces can go into one fixture)
 """
@@ -9,8 +9,8 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
-from agenttrace import config
-from agenttrace.storage.sqlite import SQLiteStorage
+from obsergent import config
+from obsergent.storage.sqlite import SQLiteStorage
 
 HOME = str(Path.home())
 

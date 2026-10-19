@@ -1,4 +1,4 @@
-"""Shared test helpers: a live AgentTrace server, and a way to drive the stdio proxy like a real client."""
+"""Shared test helpers: a live Obsergent server, and a way to drive the stdio proxy like a real client."""
 import json
 import os
 import socket
@@ -12,8 +12,8 @@ import pytest
 import uvicorn
 from opentelemetry.exporter.otlp.proto.common.trace_encoder import encode_spans
 
-from agenttrace.server.app import create_app
-from agenttrace.storage.sqlite import SQLiteStorage
+from obsergent.server.app import create_app
+from obsergent.storage.sqlite import SQLiteStorage
 
 ROOT = Path(__file__).resolve().parent.parent
 BOOKSHOP = ROOT / "examples" / "bookshop" / "bookshop_server.py"
@@ -29,14 +29,14 @@ def call_msg(msg_id, name, arguments):
 
 
 def post_spans(client, spans):
-    """Send OpenTelemetry spans to an AgentTrace app the way a real exporter does (OTLP/protobuf)."""
+    """Send OpenTelemetry spans to an Obsergent app the way a real exporter does (OTLP/protobuf)."""
     return client.post("/v1/traces", content=encode_spans(spans).SerializeToString(),
                        headers={"content-type": "application/x-protobuf"})
 
 
 @pytest.fixture
 def live_server(tmp_path):
-    """A real AgentTrace server on a free port with a temporary database. Yields (url, storage)."""
+    """A real Obsergent server on a free port with a temporary database. Yields (url, storage)."""
     storage = SQLiteStorage(tmp_path / "live.db")
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -52,10 +52,10 @@ def live_server(tmp_path):
 
 
 def run_proxy(endpoint: str, server_cmd: list[str], messages: list[dict], name="bookshop", env_extra=None):
-    """Start `agenttrace proxy`, send the messages like an MCP client, return the replies by id."""
-    env = dict(os.environ, AGENTTRACE_ENDPOINT=endpoint, **(env_extra or {}))
+    """Start `obsergent proxy`, send the messages like an MCP client, return the replies by id."""
+    env = dict(os.environ, OBSERGENT_ENDPOINT=endpoint, **(env_extra or {}))
     env.pop("MCP_PROXY_TRACEPARENT", None)  # a closed app sends none
-    proc = subprocess.Popen([sys.executable, "-m", "agenttrace.cli", "proxy", "--name", name, "--", *server_cmd],
+    proc = subprocess.Popen([sys.executable, "-m", "obsergent.cli", "proxy", "--name", name, "--", *server_cmd],
                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     replies, expected = {}, [m["id"] for m in messages if "id" in m]
     for m in messages:
@@ -81,7 +81,7 @@ def load_fixture_spans(name: str, shift_to_now: bool = True) -> list:
 
     The dashboards look at 'the last 24 hours', so a fixture recorded on some past day would otherwise be empty.
     """
-    from agenttrace.models import Span
+    from obsergent.models import Span
 
     spans = [Span(**row) for row in json.loads((ROOT / "tests" / "fixtures" / name).read_text())]
     if shift_to_now:

@@ -6,9 +6,9 @@ from pathlib import Path
 import httpx
 import pytest
 
-from agenttrace import config
-from agenttrace.server import price_sync
-from agenttrace.storage.sqlite import SQLiteStorage
+from obsergent import config
+from obsergent.server import price_sync
+from obsergent.storage.sqlite import SQLiteStorage
 
 FIXTURES = Path(__file__).parent / "fixtures" / "prices"
 

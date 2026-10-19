@@ -5,10 +5,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from agenttrace.analysis.generations import find_generations
-from agenttrace.models import Span
-from agenttrace.server.app import create_app
-from agenttrace.storage.sqlite import SQLiteStorage
+from obsergent.analysis.generations import find_generations
+from obsergent.models import Span
+from obsergent.server.app import create_app
+from obsergent.storage.sqlite import SQLiteStorage
 
 FIXTURE = Path(__file__).parent / "fixtures" / "ollama_run.json"
 

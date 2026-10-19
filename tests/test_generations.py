@@ -1,20 +1,20 @@
 """Model calls inside the agent, rebuilt from the flat span attributes.
 
 The main fixture is a REAL run: the bookshop agent with Ollama (qwen2.5:7b) answering
-"Do you have a Python book in stock, and how much is it?" through the AgentTrace proxy.
+"Do you have a Python book in stock, and how much is it?" through the Obsergent proxy.
 """
 import json
 from pathlib import Path
 
 import pytest
 
-from agenttrace.analysis.generations import (
+from obsergent.analysis.generations import (
     build_conversation,
     find_generations,
     parse_messages,
     summarize_generations,
 )
-from agenttrace.models import Span
+from obsergent.models import Span
 
 FIXTURE = Path(__file__).parent / "fixtures" / "ollama_run.json"
 

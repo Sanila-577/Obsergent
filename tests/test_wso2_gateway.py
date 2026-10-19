@@ -15,12 +15,12 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from agenttrace.cli import build_parser
-from agenttrace.ingest.gateway import normalize_gateway_spans, phase_of
-from agenttrace.models import Span
-from agenttrace.proxy.gateway import classify, outcome_attributes, session_hash
-from agenttrace.proxy.http import create_proxy_app
-from agenttrace.proxy.identity import caller_attributes
+from obsergent.cli import build_parser
+from obsergent.ingest.gateway import normalize_gateway_spans, phase_of
+from obsergent.models import Span
+from obsergent.proxy.gateway import classify, outcome_attributes, session_hash
+from obsergent.proxy.http import create_proxy_app
+from obsergent.proxy.identity import caller_attributes
 
 FIXTURE = Path(__file__).parent / "fixtures" / "apim_gateway.json"
 
@@ -35,12 +35,12 @@ def make_jwt(**claims) -> str:
 # ----------------------------------------------------------------------------- who is calling
 def test_caller_attributes_from_an_apim_style_token():
     token = make_jwt(sub="4edd01fa", client_id="CONSUMER-KEY", azp="CONSUMER-KEY", iss="https://localhost:9443/oauth2/token",
-                     aud="CONSUMER-KEY", scope="default stock:read", application={"name": "agenttrace-agent"})
+                     aud="CONSUMER-KEY", scope="default stock:read", application={"name": "obsergent-agent"})
     attributes = caller_attributes(f"Bearer {token}")
-    assert attributes["agenttrace.caller.client_id"] == "CONSUMER-KEY"
-    assert attributes["agenttrace.caller.sub"] == "4edd01fa"
-    assert attributes["agenttrace.caller.scopes"] == "default stock:read"
-    assert attributes["agenttrace.caller.application"] == "agenttrace-agent"
+    assert attributes["obsergent.caller.client_id"] == "CONSUMER-KEY"
+    assert attributes["obsergent.caller.sub"] == "4edd01fa"
+    assert attributes["obsergent.caller.scopes"] == "default stock:read"
+    assert attributes["obsergent.caller.application"] == "obsergent-agent"
     assert token not in json.dumps(attributes)  # the token itself is never part of the result
 
 
@@ -51,7 +51,7 @@ def test_unreadable_credentials_give_no_attributes(header):
 
 def test_list_valued_claims_are_flattened():
     attributes = caller_attributes("Bearer " + make_jwt(aud=["a", "b"], scp=["x", "y"]))
-    assert attributes["agenttrace.caller.audience"] == "a,b" and attributes["agenttrace.caller.scopes"] == "x y"
+    assert attributes["obsergent.caller.audience"] == "a,b" and attributes["obsergent.caller.scopes"] == "x y"
 
 
 # ------------------------------------------------------------------- what the gateway decided
@@ -156,8 +156,8 @@ def test_decisions_activity_ids_and_caller_are_recorded(gateway_proxy):
     assert unauthorized.attributes["http.response.status_code"] == 401
     assert unauthorized.status.status_code.name == "ERROR"
     assert allowed.attributes["gateway.activity_id"] == ACTIVITY  # APIM's correlation id
-    assert allowed.attributes["agenttrace.caller.client_id"] == "CK-1"
-    assert "agenttrace.caller.client_id" not in unauthorized.attributes  # no token, no identity
+    assert allowed.attributes["obsergent.caller.client_id"] == "CK-1"
+    assert "obsergent.caller.client_id" not in unauthorized.attributes  # no token, no identity
     assert allowed.attributes["mcp.session.hash"] == by_name(spans, "initialize").attributes["mcp.session.hash"]
 
 
@@ -211,7 +211,7 @@ def test_phase_names():
 def test_real_apim_spans_are_normalized():
     spans = load_fixture()
     normalize_gateway_spans(spans)
-    gateway = [s for s in spans if s.attributes.get("agenttrace.layer") == "gateway"]
+    gateway = [s for s in spans if s.attributes.get("obsergent.layer") == "gateway"]
     assert gateway and {s.service for s in gateway} == {"API:Gateway"}
     phases = {s.attributes["gateway.phase"] for s in gateway if "gateway.phase" in s.attributes}
     assert {"key_validation", "backend", "request_mediation", "response_mediation"} <= phases
@@ -224,14 +224,14 @@ def test_real_apim_spans_are_normalized():
     refused = [c for c in calls if c.attributes["gateway.decision"] != "allowed"]
     assert all(c.status_code == "ERROR" and "gateway: HTTP" in c.status_message for c in refused)  # APIM says UNSET
     spans_without_gateway_layer = [s for s in spans if s not in gateway]
-    assert all("agenttrace.layer" not in s.attributes for s in spans_without_gateway_layer)  # proxy spans untouched
+    assert all("obsergent.layer" not in s.attributes for s in spans_without_gateway_layer)  # proxy spans untouched
 
 
 def test_gateway_and_proxy_spans_form_one_trace_and_share_the_activity_id():
     spans = load_fixture()
     normalize_gateway_spans(spans)
-    proxy_call = next(s for s in spans if s.service == "agenttrace-proxy" and s.name == "tools/call search_books")
-    call_at_gateway = next(s for s in spans if s.attributes.get("agenttrace.layer") == "gateway"
+    proxy_call = next(s for s in spans if s.service == "obsergent-proxy" and s.name == "tools/call search_books")
+    call_at_gateway = next(s for s in spans if s.attributes.get("obsergent.layer") == "gateway"
                            and s.attributes.get("gateway.decision") == "allowed")
     assert call_at_gateway.trace_id == proxy_call.trace_id  # APIM continued the proxy's traceparent
     assert call_at_gateway.parent_span_id == proxy_call.span_id  # ...as a child of the proxy's span

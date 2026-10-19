@@ -8,9 +8,9 @@ describe("JsonView", () => {
     expect(container.textContent).toContain('"query": "python"');
   });
 
-  it("highlights what AgentTrace hid and explains it", () => {
+  it("highlights what Obsergent hid and explains it", () => {
     render(<JsonView value='{"api_key": "***", "note": "key ***"}' />);
-    const hidden = screen.getAllByTitle(/hidden by agenttrace/i);
+    const hidden = screen.getAllByTitle(/hidden by obsergent/i);
     expect(hidden).toHaveLength(2); // the whole value, and the part inside a longer string
     expect(hidden[0]).toHaveTextContent("***");
     expect(hidden[0]).toHaveClass("redacted");

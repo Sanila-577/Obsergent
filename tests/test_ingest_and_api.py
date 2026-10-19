@@ -5,9 +5,9 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from agenttrace.server.app import create_app
-from agenttrace.storage.sqlite import SQLiteStorage
 from conftest import post_spans
+from obsergent.server.app import create_app
+from obsergent.storage.sqlite import SQLiteStorage
 
 
 def make_spans():

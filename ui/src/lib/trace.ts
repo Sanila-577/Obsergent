@@ -21,9 +21,9 @@ export function layerOf(span: Span): Layer {
   // Shortcut.
   const attrs = span.attributes;
   // Marked by the server as an API Manager span.
-  if (attrs["agenttrace.layer"] === "gateway") return "gateway";
-  // Recorded by the AgentTrace proxy (it has MCP method info).
-  if (span.service === "agenttrace-proxy" || attrs["mcp.method.name"]) return "proxy";
+  if (attrs["obsergent.layer"] === "gateway") return "gateway";
+  // Recorded by the Obsergent proxy (it has MCP method info).
+  if (span.service === "obsergent-proxy" || attrs["mcp.method.name"]) return "proxy";
   // A model call.
   if (attrs["openinference.span.kind"] === "LLM") return "model";
   // Another agent step (chain, tool...).

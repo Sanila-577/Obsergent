@@ -1,7 +1,7 @@
-"""A tiny Streamable-HTTP MCP server for trying `agenttrace proxy-http` without any real remote server.
+"""A tiny Streamable-HTTP MCP server for trying `obsergent proxy-http` without any real remote server.
 
     python scripts/fake_http_mcp.py              # listens on http://127.0.0.1:9000/mcp
-    agenttrace proxy-http --name demo --url http://127.0.0.1:9000/mcp
+    obsergent proxy-http --name demo --url http://127.0.0.1:9000/mcp
     curl -s -X POST http://127.0.0.1:7319/mcp/demo -H 'content-type: application/json' \
          -H 'accept: application/json, text/event-stream' \
          -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"echo","arguments":{"text":"hi"}}}'

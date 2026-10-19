@@ -91,7 +91,7 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
 
 export function ErrorBox({ error }: { error: unknown }) {
   const message = error instanceof ApiError ? `${error.status}: ${error.message}` : error instanceof Error ? error.message : String(error);
-  return <div className="error-box" role="alert"><strong>Could not load this.</strong> {message}<div className="muted">Is AgentTrace running? Start it with <code>make up</code>.</div></div>;
+  return <div className="error-box" role="alert"><strong>Could not load this.</strong> {message}<div className="muted">Is Obsergent running? Start it with <code>make up</code>.</div></div>;
 }
 
 export function Skeleton({ lines = 3 }: { lines?: number }) {

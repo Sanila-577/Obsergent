@@ -22,7 +22,7 @@ export function FirstRun({ kind, title }: { kind: keyof typeof WHAT; title?: str
       <p className="muted">Three steps and this page fills itself:</p>
       <ol>
         <li><strong>The server is running</strong> <span className="badge ok">you are here</span></li>
-        <li><strong>Run your agent or app</strong> so it reports to AgentTrace. For the example agent:
+        <li><strong>Run your agent or app</strong> so it reports to Obsergent. For the example agent:
           <pre className="code mono">{run}</pre><CopyButton text={run} label="Copy" /></li>
         <li><strong>Watch it appear.</strong> This page checks every few seconds.</li>
       </ol>

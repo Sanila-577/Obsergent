@@ -1,0 +1,72 @@
+/* Design tokens: every colour, radius and shadow of the app. Dark is the default; light overrides it.
+   Panels are translucent ("glass") but never below --glass-min opacity, so text keeps a contrast of at least 4.5:1. */
+
+:root, [data-theme="dark"] {
+  --bg: #070b18;
+  --panel: #101a30;
+  --panel-2: #16223d;
+  --border: #26365c;
+  --text: #eaf0ff;
+  --muted: #9aa8c9;
+  --accent: #38bdf8;
+  --accent-2: #2dd4bf;
+  --accent-3: #f472b6;
+  --accent-soft: rgba(56, 189, 248, 0.16);
+  --hover: rgba(148, 163, 255, 0.09);
+  /* layers of a run */
+  --agent: #60a5fa;
+  --model: #2dd4bf;
+  --proxy: #a78bfa;
+  --gateway: #fb923c;
+  --server: #4ade80;
+  /* outcomes */
+  --ok: #4ade80;
+  --warn: #fbbf24;
+  --bad: #f87171;
+  --low: #94a3b8;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  /* glass */
+  --glass: rgba(16, 26, 48, 0.66);
+  --glass-strong: rgba(18, 29, 54, 0.82);
+  --glass-border: rgba(160, 190, 255, 0.18);
+  --glass-highlight: rgba(255, 255, 255, 0.07);
+  --glass-shadow: 0 10px 34px rgba(0, 0, 0, 0.38);
+  --mesh-a: rgba(56, 189, 248, 0.20);
+  --mesh-b: rgba(167, 139, 250, 0.18);
+  --mesh-c: rgba(45, 212, 191, 0.14);
+  --radius: 16px;
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --bg: #eef2fb;
+  --panel: #ffffff;
+  --panel-2: #f4f7fd;
+  --border: #d2daee;
+  --text: #14203a;
+  --muted: #4f5d80;
+  --accent: #0369a1;
+  --accent-2: #0f766e;
+  --accent-3: #be185d;
+  --accent-soft: rgba(3, 105, 161, 0.1);
+  --hover: rgba(30, 41, 90, 0.06);
+  --agent: #2563eb;
+  --model: #0d9488;
+  --proxy: #7c3aed;
+  --gateway: #c2410c;
+  --server: #15803d;
+  --ok: #15803d;
+  --warn: #b45309;
+  --bad: #dc2626;
+  --low: #64748b;
+  --shadow: 0 8px 24px rgba(30, 41, 90, 0.12);
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-strong: rgba(255, 255, 255, 0.88);
+  --glass-border: rgba(60, 80, 140, 0.16);
+  --glass-highlight: rgba(255, 255, 255, 0.9);
+  --glass-shadow: 0 10px 30px rgba(40, 55, 110, 0.14);
+  --mesh-a: rgba(56, 189, 248, 0.30);
+  --mesh-b: rgba(167, 139, 250, 0.24);
+  --mesh-c: rgba(45, 212, 191, 0.20);
+  color-scheme: light;
+}

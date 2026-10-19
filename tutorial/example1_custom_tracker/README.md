@@ -1,7 +1,7 @@
 # Example 1: a custom tracker with OpenTelemetry
 
 Write your own OpenTelemetry exporter that saves spans to SQLite. This is
-AgentTrace's storage idea in about 80 lines.
+Obsergent's storage idea in about 80 lines.
 
 ## Files
 

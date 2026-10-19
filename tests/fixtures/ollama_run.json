@@ -15,8 +15,8 @@
  },
  {
   "attributes": {
-   "agenttrace.session.command": "/home/user/Documents/AgentTrace/examples/bookshop/../../.venv/bin/python bookshop_server.py",
-   "agenttrace.session.id": "f78d03bea0464734b897117ad18cacc0",
+   "obsergent.session.command": "/home/user/Documents/Obsergent/examples/bookshop/../../.venv/bin/python bookshop_server.py",
+   "obsergent.session.id": "f78d03bea0464734b897117ad18cacc0",
    "jsonrpc.request.id": "0",
    "mcp.method.name": "initialize",
    "mcp.result": "{\"capabilities\": {\"experimental\": {}, \"prompts\": {\"listChanged\": false}, \"resources\": {\"listChanged\": false, \"subscribe\": false}, \"tools\": {\"listChanged\": false}}, \"protocolVersion\": \"2025-11-25\", \"serverInfo\": {\"name\": \"Bookshop\", \"version\": \"1.30.0\"}}",
@@ -27,7 +27,7 @@
   "kind": "CLIENT",
   "name": "initialize",
   "parent_span_id": "29e1ed56eae05183",
-  "service": "agenttrace-proxy",
+  "service": "obsergent-proxy",
   "span_id": "f6d035f3008875b3",
   "start_ns": 1792230007454557000,
   "status_code": "UNSET",
@@ -36,8 +36,8 @@
  },
  {
   "attributes": {
-   "agenttrace.session.command": "/home/user/Documents/AgentTrace/examples/bookshop/../../.venv/bin/python bookshop_server.py",
-   "agenttrace.session.id": "f78d03bea0464734b897117ad18cacc0",
+   "obsergent.session.command": "/home/user/Documents/Obsergent/examples/bookshop/../../.venv/bin/python bookshop_server.py",
+   "obsergent.session.id": "f78d03bea0464734b897117ad18cacc0",
    "jsonrpc.request.id": "1",
    "mcp.method.name": "tools/list",
    "mcp.server.name": "bookshop",
@@ -48,7 +48,7 @@
   "kind": "CLIENT",
   "name": "tools/list",
   "parent_span_id": "29e1ed56eae05183",
-  "service": "agenttrace-proxy",
+  "service": "obsergent-proxy",
   "span_id": "4686ba0688170324",
   "start_ns": 1792230007615633000,
   "status_code": "UNSET",
@@ -208,8 +208,8 @@
  },
  {
   "attributes": {
-   "agenttrace.session.command": "/home/user/Documents/AgentTrace/examples/bookshop/../../.venv/bin/python bookshop_server.py",
-   "agenttrace.session.id": "f78d03bea0464734b897117ad18cacc0",
+   "obsergent.session.command": "/home/user/Documents/Obsergent/examples/bookshop/../../.venv/bin/python bookshop_server.py",
+   "obsergent.session.id": "f78d03bea0464734b897117ad18cacc0",
    "gen_ai.operation.name": "execute_tool",
    "gen_ai.tool.name": "search_books",
    "jsonrpc.request.id": "2",
@@ -223,7 +223,7 @@
   "kind": "CLIENT",
   "name": "tools/call search_books",
   "parent_span_id": "f669d0690c3db7c0",
-  "service": "agenttrace-proxy",
+  "service": "obsergent-proxy",
   "span_id": "1e18523efe8aeac5",
   "start_ns": 1792230013799756000,
   "status_code": "UNSET",
@@ -369,8 +369,8 @@
  },
  {
   "attributes": {
-   "agenttrace.session.command": "/home/user/Documents/AgentTrace/examples/bookshop/../../.venv/bin/python bookshop_server.py",
-   "agenttrace.session.id": "f78d03bea0464734b897117ad18cacc0",
+   "obsergent.session.command": "/home/user/Documents/Obsergent/examples/bookshop/../../.venv/bin/python bookshop_server.py",
+   "obsergent.session.id": "f78d03bea0464734b897117ad18cacc0",
    "gen_ai.operation.name": "execute_tool",
    "gen_ai.tool.name": "get_price_and_stock",
    "jsonrpc.request.id": "3",
@@ -384,7 +384,7 @@
   "kind": "CLIENT",
   "name": "tools/call get_price_and_stock",
   "parent_span_id": "4863b353395c2773",
-  "service": "agenttrace-proxy",
+  "service": "obsergent-proxy",
   "span_id": "e4e60fcbaa53a4a1",
   "start_ns": 1792230015305518000,
   "status_code": "UNSET",

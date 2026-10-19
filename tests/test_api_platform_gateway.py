@@ -1,15 +1,15 @@
 """The WSO2 API Platform gateway (Envoy router + policy engine): its spans, recorded from a real gateway 1.2.1.
 
-tests/fixtures/api_platform_gateway.json holds three traces captured through `agenttrace proxy-http`:
+tests/fixtures/api_platform_gateway.json holds three traces captured through `obsergent proxy-http`:
 a tools/list, an allowed tools/call, and a tools/call the `mcp-acl-list` policy refused (HTTP 400, JSON-RPC code -32000).
 Every gateway span is stored with its original attributes (the gateway.* ones are added at ingest).
 """
 import pytest
 
-from agenttrace.analysis.gateway_view import summarize_gateway
-from agenttrace.ingest.gateway import is_gateway_span, normalize_gateway_spans, platform_phase
-from agenttrace.proxy.gateway import classify
 from conftest import load_fixture_spans
+from obsergent.analysis.gateway_view import summarize_gateway
+from obsergent.ingest.gateway import is_gateway_span, normalize_gateway_spans, platform_phase
+from obsergent.proxy.gateway import classify
 
 FIXTURE = "api_platform_gateway.json"
 
@@ -24,8 +24,8 @@ def spans():
 def test_router_and_policy_engine_spans_are_gateway_spans(spans):
     gateway = [s for s in spans if s.service in ("router", "policy-engine")]
     assert gateway and all(is_gateway_span(s) for s in gateway)
-    assert all(s.attributes["agenttrace.layer"] == "gateway" for s in gateway)
-    assert not any("agenttrace.layer" in s.attributes for s in spans if s.service == "agenttrace-proxy")
+    assert all(s.attributes["obsergent.layer"] == "gateway" for s in gateway)
+    assert not any("obsergent.layer" in s.attributes for s in spans if s.service == "obsergent-proxy")
 
 
 def test_phases_are_backend_and_policy_engine(spans):
@@ -47,12 +47,12 @@ def test_gateway_spans_join_the_proxy_trace(spans):
     for trace_id in {s.trace_id for s in spans}:
         in_trace = [s for s in spans if s.trace_id == trace_id]
         roots = [s for s in in_trace if s.parent_span_id is None]
-        assert len(roots) == 1 and roots[0].service == "agenttrace-proxy"  # the gateway continued the traceparent
+        assert len(roots) == 1 and roots[0].service == "obsergent-proxy"  # the gateway continued the traceparent
 
 
 def test_summary_matches_gateway_calls_to_proxy_calls_and_uses_the_specific_decision(spans):
-    gateway = [s for s in spans if s.attributes.get("agenttrace.layer") == "gateway"]
-    proxy = [s for s in spans if s.attributes.get("gateway.decision") and "agenttrace.layer" not in s.attributes]
+    gateway = [s for s in spans if s.attributes.get("obsergent.layer") == "gateway"]
+    proxy = [s for s in spans if s.attributes.get("gateway.decision") and "obsergent.layer" not in s.attributes]
     summary = summarize_gateway(gateway, proxy)
     assert summary["calls_total"] == 3
     assert summary["decisions"] == {"allowed": 2, "denied": 1}  # the proxy saw -32000 "not allowed"

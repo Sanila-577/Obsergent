@@ -1,11 +1,11 @@
-"""Pretend to be a closed MCP app (like Claude Desktop): talk to a server THROUGH the AgentTrace proxy.
+"""Pretend to be a closed MCP app (like Claude Desktop): talk to a server THROUGH the Obsergent proxy.
 
     python scripts/raw_mcp_session.py                      # one session with the bookshop server
     python scripts/raw_mcp_session.py --name shifty --server examples/bookshop/bookshop_server.py
 
 No trace id is sent (a closed app never sends one), so every request becomes its own trace,
-grouped by the proxy session. Start `agenttrace up` first. Then run:
-    agenttrace traces      agenttrace sessions
+grouped by the proxy session. Start `obsergent up` first. Then run:
+    obsergent traces      obsergent sessions
 """
 import argparse
 import json
@@ -21,9 +21,9 @@ parser.add_argument("--server", default=str(ROOT / "examples" / "bookshop" / "bo
                     help="path of the MCP server script to run behind the proxy")
 args = parser.parse_args()
 
-# Exactly what Claude Desktop would start: `agenttrace proxy --name X -- <real server command>`.
+# Exactly what Claude Desktop would start: `obsergent proxy --name X -- <real server command>`.
 proc = subprocess.Popen(
-    [sys.executable, "-m", "agenttrace.cli", "proxy", "--name", args.name, "--", sys.executable, args.server],
+    [sys.executable, "-m", "obsergent.cli", "proxy", "--name", args.name, "--", sys.executable, args.server],
     stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
 
 messages = [
@@ -43,4 +43,4 @@ for msg in messages:
         print(f"id={reply['id']}: {json.dumps(reply['result'])[:90]}...")
 proc.stdin.close()  # hang up: the proxy sends its spans and exits
 proc.wait(timeout=20)
-print("done. Now run:  agenttrace traces   |   agenttrace sessions")
+print("done. Now run:  obsergent traces   |   obsergent sessions")

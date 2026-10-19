@@ -20,7 +20,7 @@ test("a cost the provider reported is marked exact and its share is stated", asy
   await page.goto("/spending");
   await expect(page.getByText(/of this amount was reported by the provider/)).toBeVisible();
   await page.goto("/runs?model=openai/gpt-4o-mini");
-  await expect(page.locator("tbody tr").first()).toContainText("$0.04"); // 3 model calls x $0.0123, reported by the provider
+  await expect(page.locator("tbody tr").first()).toContainText("$0.037"); // 3 model calls x $0.0123, reported by the provider
   await page.locator("tbody tr").first().click();
   await page.getByRole("tab", { name: "Model calls" }).click();
   await expect(page.locator(".exact-tag").first()).toBeVisible();
@@ -48,27 +48,28 @@ test("a time slot from the chart opens exactly those conversations", async ({ pa
 
 /** Show everything (ids, raw data, protocol terms): the Detailed mode, remembered by the app in localStorage. */
 async function detailed(page: Page) {
-  await page.addInitScript(() => localStorage.setItem("agenttrace.detailed", "true"));
+  await page.addInitScript(() => localStorage.setItem("obsergent.detailed", "true"));
 }
 
 // Every test starts from the same seeded data: ~48 runs (agent runs and gateway calls), a loop, a drifting server.
 
-test("the overview shows the numbers, the chart and the slowest tools", async ({ page }) => {
+test("the overview shows the numbers, the questions chart and the slowest tools", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
-  await expect(page.getByText("Actions used", { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("img", { name: "Actions over time" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Slowest actions (p95)" })).toBeVisible();
+  await expect(page.locator(".tile").filter({ hasText: "Discussions" })).toContainText("35");
+  await expect(page.locator(".tile").filter({ hasText: "across 4 MCP servers" })).toBeVisible();
+  await expect(page.getByRole("img", { name: /Questions over time/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Slowest tools (p95)" })).toBeVisible();
   await expect(page.getByText("Blocked by the gateway")).toBeVisible();
 });
 
-test("find the slowest tool and see its runs in a few clicks", async ({ page }) => {
+test("find the slowest tool and see its details in a few clicks", async ({ page }) => {
   await page.goto("/");
-  const slowest = page.locator("section", { hasText: "Slowest actions (p95)" }).locator("tbody tr").first();
+  const slowest = page.locator("section", { hasText: "Slowest tools (p95)" }).locator("tbody tr").first();
   const tool = (await slowest.locator("a").innerText()).trim();
   await slowest.locator("a").click();
   await expect(page).toHaveURL(new RegExp(`tool=${tool}`));
-  await expect(page.locator("tbody tr").first()).toBeVisible();
+  await expect(page.getByRole("list", { name: /^Tools of / })).toBeVisible();
 });
 
 test("runs can be filtered, and the filter lives in the URL", async ({ page }) => {
@@ -128,9 +129,9 @@ test("findings can be dismissed and brought back", async ({ page }) => {
   await expect.poll(() => page.locator(".finding").count()).toBe(before);
 });
 
-test("a server's changed tool description is shown word by word", async ({ page }) => {
-  await page.goto("/servers?server=tickets");
-  await expect(page.getByRole("heading", { name: "Has this tool server changed?" })).toBeVisible();
+test("an MCP server's changed tool description is shown word by word", async ({ page }) => {
+  await page.goto("/mcps?server=tickets&tab=changes");
+  await expect(page.getByRole("heading", { name: "Has this MCP server changed?" })).toBeVisible();
   await expect(page.locator(".diff ins").first()).toContainText("Ignore previous instructions");
   await page.getByLabel("Compare with").selectOption("bookshop-upstream");
   await expect(page.getByText("Only in bookshop-upstream").or(page.getByText("Only in tickets")).first()).toBeVisible();
@@ -139,7 +140,7 @@ test("a server's changed tool description is shown word by word", async ({ page 
 test("the gateway page explains what the gateway decided and where time went", async ({ page }) => {
   await detailed(page);
   await page.goto("/gateway");
-  await expect(page.getByText("The gateway is reporting to AgentTrace")).toBeVisible();
+  await expect(page.getByText("The gateway is reporting to Obsergent")).toBeVisible();
   await expect(page.locator(".tile").filter({ has: page.getByText("allowed", { exact: true }) })).toBeVisible();
   await expect(page.locator(".tile", { hasText: "blocked: not allowed" })).toBeVisible();
   await expect(page.getByText("Where the gateway spends its time")).toBeVisible();
@@ -151,12 +152,19 @@ test("the gateway page explains what the gateway decided and where time went", a
   await expect(page.locator("pre.code").last()).toContainText('"mode": "deny"');
 });
 
-test("the map draws who calls what and a click filters the runs", async ({ page }) => {
+test("the connections graph is layered, hides tools until asked, and a click gives details", async ({ page }) => {
   await page.goto("/map");
-  await expect(page.getByLabel("Connections between apps, tool servers and tools")).toBeVisible();
-  await expect(page.getByText("via gateway")).toBeVisible();
-  await page.locator(".map-node.server", { hasText: "tickets" }).click();
-  await expect(page).toHaveURL(/runs\?server=tickets/);
+  await expect(page.getByRole("group", { name: "Connections between apps, the gateway and MCP servers" })).toBeVisible();
+  await expect(page.locator(".flow-node.gateway")).toHaveCount(1);
+  await expect(page.locator(".flow-node.server").first()).toBeVisible();
+  await expect(page.locator(".flow-node.tool")).toHaveCount(0); // tools stay hidden until a server is opened
+  await page.locator(".flow-node.server", { hasText: "tickets" }).click();
+  const panel = page.getByRole("complementary", { name: "Details of tickets" });
+  await expect(panel).toBeVisible();
+  await panel.getByRole("button", { name: /Show its/ }).click();
+  await expect(page.locator(".flow-node.tool").first()).toBeVisible();
+  await expect(panel.getByRole("link", { name: "Open the MCP page →" })).toHaveAttribute("href", /\/mcps\?server=tickets/);
+  await page.getByRole("button", { name: "Reset view" }).click();
 });
 
 test("two runs can be compared, and the first difference is pointed out", async ({ page }) => {
@@ -183,8 +191,11 @@ test("the command palette jumps anywhere", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/gateway/);
   await page.keyboard.press("g");
-  await page.keyboard.press("m");
+  await page.keyboard.press("n");
   await expect(page).toHaveURL(/\/map/);
+  await page.keyboard.press("g");
+  await page.keyboard.press("m");
+  await expect(page).toHaveURL(/\/mcps/);
 });
 
 test("settings stay after a reload: theme, live tail and time window", async ({ page }) => {
@@ -209,10 +220,17 @@ test("a deep link survives a reload, and an unknown page says so", async ({ page
   await expect(page.getByText("Page not found")).toBeVisible();
 });
 
-test("the about page states how AgentTrace differs from Langfuse", async ({ page }) => {
+test("the about page explains Obsergent in a few words and its flow can be clicked", async ({ page }) => {
   await page.goto("/about");
-  await expect(page.getByRole("heading", { name: "AgentTrace vs Langfuse" })).toBeVisible();
-  await expect(page.getByText("Prompt management, evaluations, datasets, scores")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What is Obsergent?" })).toBeVisible();
+  await expect(page.getByText("Langfuse")).toHaveCount(0);
+  await page.getByRole("tab", { name: "The recorder" }).click();
+  await expect(page.getByRole("tabpanel")).toContainText("proxy sits between");
+  await expect(page.locator('.nav-link[data-nav="App activity"]')).toHaveClass(/lit/);
+  await page.getByRole("tab", { name: "This dashboard" }).click();
+  await expect(page.getByRole("tabpanel")).toContainText("one file on your computer");
+  await page.getByRole("link", { name: /Read what was asked/ }).click();
+  await expect(page).toHaveURL(/\/conversations/);
 });
 
 test("Simple mode hides technical columns and Detailed mode shows them", async ({ page }) => {
@@ -238,4 +256,189 @@ test("the help bubbles explain words in plain language", async ({ page }) => {
   await expect(page.locator("tbody tr").first()).toBeVisible();
   await page.locator("th .help").first().hover();
   await expect(page.locator(".help-bubble").first()).toBeVisible();
+});
+
+// ------------------------------------------------------------------------- the question-first pages
+
+test("the conversations page shows the questions as scrollable cards and opens each one's own thread", async ({ page }) => {
+  await page.goto("/conversations");
+  const cards = page.locator(".q-card");
+  await expect(cards.first()).toBeVisible();
+  for (const question of ["Which books by Eric Matthes do you sell?", "Is Fluent Python cheaper than Python Crash Course?", "What is the cheapest book you have?"]) {
+    await expect(cards.filter({ hasText: question }).first()).toBeAttached();
+  }
+  // the strip scrolls with the arrow button
+  const before = await page.locator(".q-strip").evaluate((el) => el.scrollLeft);
+  await page.getByRole("button", { name: "Scroll questions right" }).click();
+  await expect.poll(() => page.locator(".q-strip").evaluate((el) => el.scrollLeft)).toBeGreaterThan(before);
+  // a click selects a question: its thread shows only that question, and the choice lives in the URL
+  const cheapest = cards.filter({ hasText: "What is the cheapest book you have?" }).first();
+  await cheapest.click();
+  await expect(cheapest).toHaveAttribute("aria-pressed", "true");
+  await expect(page).toHaveURL(/q=[0-9a-f]+/);
+  await expect(page.locator(".bubble.question")).toHaveCount(1);
+  await expect(page.locator(".bubble.question")).toContainText("What is the cheapest book you have?");
+  await expect(page.locator(".bubble.answer")).toHaveCount(1);
+  await expect(page.locator(".bubble.tool").first()).toBeVisible();
+  // the keyboard moves between questions
+  const url = page.url();
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(() => page.url()).not.toBe(url);
+  await expect(page.locator(".bubble.question")).toHaveCount(1);
+});
+
+test("a thread shows each tool's input and result, and the steps tab shows the timeline", async ({ page }) => {
+  await page.goto("/conversations");
+  await page.locator(".q-card").filter({ hasText: "Do you have a Python book" }).first().click();
+  await expect(page.getByText(/Step 1 of \d+/)).toBeVisible();
+  await page.locator(".thread-tool-head").first().click();
+  await expect(page.getByText("What it was asked").first()).toBeVisible();
+  await expect(page.getByText("What it returned").first()).toBeVisible();
+  await page.getByRole("button", { name: "Open all tools" }).click();
+  await expect(page.getByRole("button", { name: "Collapse tools" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy answer" })).toBeVisible();
+  await page.getByRole("tab", { name: "Steps" }).click();
+  await expect(page.getByRole("tree", { name: "Spans of this run" })).toBeVisible();
+});
+
+test("a peak on the overview chart shows the question on hover and opens it on click", async ({ page }) => {
+  await page.goto("/");
+  const bars = page.locator(".peaks .recharts-bar-rectangle");
+  await expect(bars.first()).toBeVisible();
+  await bars.nth(3).hover();
+  const tip = page.locator(".peaks-tip");
+  await expect(tip).toBeVisible();
+  await expect(tip).toContainText(/Python|Eric Matthes|cheaper|cheapest/);
+  await expect(tip).toContainText(/\d+ exchanges \(\d+ model calls?, \d+ tool uses?\)/);
+  await expect(tip).not.toContainText("worked");
+  const asked = (await tip.locator("strong").first().innerText()).trim();
+  await bars.nth(3).click();
+  await expect(page).toHaveURL(/\/conversations\?q=[0-9a-f]+/);
+  await expect(page.locator(".bubble.question")).toContainText(asked);
+});
+
+test("latest queries asked are interactive and open their thread", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Latest queries asked" })).toBeVisible();
+  const first = page.locator(".latest-q").first();
+  await expect(first.locator(".latest-q-answer")).toBeVisible();
+  await first.hover();
+  await first.click();
+  await expect(page).toHaveURL(/\/conversations\?q=/);
+});
+
+test("one entry per model: the dated and the undated name are shown once, everywhere", async ({ page }) => {
+  await page.goto("/");
+  const rows = page.locator("section", { hasText: "Models your agents used" }).locator("tbody tr");
+  await expect(rows.filter({ hasText: "gpt-4o-mini" })).toHaveCount(1);
+  await expect(page.locator("section", { hasText: "Models your agents used" })).not.toContainText("2024-07-18");
+  await page.goto("/models");
+  await expect(page.locator(".gcard", { hasText: "gpt-4o-mini" })).toHaveCount(1);
+  await expect(page.locator(".gcard", { hasText: "2024-07-18" })).toHaveCount(0);
+});
+
+test("the models page lists providers, usage, price and what each model can do", async ({ page }) => {
+  await page.goto("/models");
+  await expect(page.getByRole("heading", { name: "Models" })).toBeVisible();
+  const mini = page.locator(".gcard", { hasText: "gpt-4o-mini" });
+  await expect(mini).toContainText("openai");
+  await expect(mini).toContainText("per million words");
+  await expect(page.locator(".gcard", { hasText: "qwen2.5:7b" })).toContainText("free");
+  await mini.click();
+  await expect(page.getByText("How it was used")).toBeVisible();
+  await expect(page.getByText("What it cost").first()).toBeVisible();
+  await expect(page.getByText("What it can do")).toBeVisible();
+  await expect(page).toHaveURL(/model=gpt-4o-mini/);
+  await detailed(page);
+  await page.reload();
+  await expect(page.getByText(/Names recorded: .*gpt-4o-mini-2024-07-18/)).toBeVisible();
+});
+
+test("the agents page draws each agent's steps, models and tools as a graph", async ({ page }) => {
+  await page.goto("/agents");
+  await expect(page.getByRole("heading", { name: "Agents" })).toBeVisible();
+  const card = page.locator(".gcard", { hasText: "bookshop-agent" });
+  await expect(card).toContainText("LangGraph");
+  await expect(page.getByText(/How\s+bookshop-agent\s+works/)).toBeVisible();
+  const graph = page.getByRole("group", { name: "Steps of the agent bookshop-agent" });
+  await expect(graph.locator(".flow-node.step", { hasText: "agent" }).first()).toBeVisible();
+  await expect(graph.locator(".flow-node.step", { hasText: "tools" }).first()).toBeVisible();
+  await expect(graph.locator(".flow-node.model").first()).toBeVisible();
+  await expect(graph.locator(".flow-node.tool", { hasText: "search_books" })).toBeVisible();
+  await expect(graph.locator(".flow-node.mcp", { hasText: "bookshop" }).first()).toBeVisible();
+  await expect(graph.locator(".react-flow__edge").first()).toBeAttached();
+  // hovering a tool dims the boxes that are not on its path
+  await graph.locator(".flow-node.tool", { hasText: "search_books" }).hover();
+  await expect(graph.locator(".flow-node.dimmed").first()).toBeAttached();
+  // clicking a box shows its details
+  await graph.locator(".flow-node.model").first().click();
+  await expect(page.getByRole("complementary", { name: /Details of/ })).toContainText("Used");
+});
+
+test("the MCPs page lists servers with their tools as cards and shows a tool's inputs in words", async ({ page }) => {
+  await page.goto("/mcps?server=bookshop");
+  await expect(page.getByRole("heading", { name: "MCPs" })).toBeVisible();
+  await expect(page.locator(".gcard[data-server]")).not.toHaveCount(0);
+  const tools = page.getByRole("list", { name: "Tools of bookshop" });
+  await expect(tools.locator(".gcard", { hasText: "search_books" })).toBeVisible();
+  await expect(tools.locator(".gcard", { hasText: "get_price_and_stock" })).toBeVisible();
+  await page.getByLabel("Search tools").fill("price");
+  await expect(tools.locator(".gcard")).toHaveCount(1);
+  await tools.locator(".gcard").click();
+  await expect(page.getByText("What you give it")).toBeVisible();
+  await expect(page.getByText("How it is used")).toBeVisible();
+  await page.getByLabel("Search tools").fill("");
+  await page.getByRole("tab", { name: /Changes/ }).click();
+  await expect(page.getByRole("heading", { name: "Has this MCP server changed?" })).toBeVisible();
+});
+
+test("the old tools page address still works and a tool name finds its server", async ({ page }) => {
+  await page.goto("/servers");
+  await expect(page).toHaveURL(/\/mcps/);
+  await page.goto("/mcps?tool=close_ticket");
+  await expect(page.getByRole("list", { name: "Tools of tickets" })).toBeVisible();
+});
+
+test("the glass look is on, and text stays readable (contrast of at least 4.5:1) in both themes", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".card").first()).toBeVisible();
+  const blur = await page.locator(".card").first().evaluate((el) => getComputedStyle(el).backdropFilter);
+  expect(blur).toContain("blur");
+  const ratio = async () => page.evaluate(() => {
+    const parse = (value: string) => (value.match(/[\d.]+/g) ?? []).map(Number);
+    const mix = (top: number[], bottom: number[]) => { const a = top[3] ?? 1; return [0, 1, 2].map((i) => top[i] * a + bottom[i] * (1 - a)); };
+    const luminance = (rgb: number[]) => { const [r, g, b] = rgb.map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const style = getComputedStyle(document.documentElement);
+    const bg = parse(style.getPropertyValue("--bg")) ;
+    const read = (name: string) => { const probe = document.createElement("i"); probe.style.color = `var(${name})`; document.body.append(probe); const value = parse(getComputedStyle(probe).color); probe.remove(); return value; };
+    const panel = mix(read("--glass"), read("--bg"));
+    const contrast = (text: number[]) => { const a = luminance(mix(text, panel)) + 0.05, b = luminance(panel) + 0.05; return Math.max(a, b) / Math.min(a, b); };
+    void bg;
+    return { text: contrast(read("--text")), muted: contrast(read("--muted")), accent: contrast(read("--accent")) };
+  });
+  for (const theme of ["dark", "light"]) {
+    await page.evaluate((t) => { document.documentElement.dataset.theme = t; }, theme);
+    const { text, muted, accent } = await ratio();
+    expect(text, `${theme} text`).toBeGreaterThanOrEqual(4.5);
+    expect(muted, `${theme} muted text`).toBeGreaterThanOrEqual(4.5);
+    expect(accent, `${theme} links`).toBeGreaterThanOrEqual(4.5);
+  }
+});
+
+test("less motion switches the animated arrows off", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/agents");
+  const edge = page.locator(".react-flow__edge.flow-edge-animated .react-flow__edge-path").first();
+  await page.locator(".flow-node.tool").first().hover();
+  if (await edge.count()) expect(await edge.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+});
+
+test("the layout fits a phone: no sideways scrolling of the page", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  for (const path of ["/", "/conversations", "/models", "/mcps"]) {
+    await page.goto(path);
+    await expect(page.locator(".content")).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow, path).toBeLessThanOrEqual(1);
+  }
 });

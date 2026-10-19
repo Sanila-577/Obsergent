@@ -1,7 +1,7 @@
 # Example 5: an MCP proxy with OpenTelemetry
 
 Goal: record **every MCP message** between any client and any server, and join
-those spans to the agent's trace. This is AgentTrace's key component.
+those spans to the agent's trace. This is Obsergent's key component.
 
 Example 4 showed the inside of the agent but not the MCP traffic. The proxy
 fills that gap: it sits between client and server and works for any stdio MCP

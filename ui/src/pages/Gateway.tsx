@@ -1,4 +1,4 @@
-// The WSO2 API Platform MCP gateway, seen from AgentTrace: what it decided, where the time went, who is calling,
+// The WSO2 API Platform MCP gateway, seen from Obsergent: what it decided, where the time went, who is calling,
 // and a suggested access-control policy based on what was really used.
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, ShieldCheck } from "lucide-react";
@@ -14,8 +14,8 @@ import { DECISION_WORDS, PAGES } from "../lib/words";
 
 const DECISION_ORDER = ["allowed", "unauthorized", "forbidden", "throttled", "denied", "error"];
 
-const SETUP_SNIPPET = `# 1. AgentTrace: accept the gateway's OpenTelemetry (gRPC) and the proxy's spans
-agenttrace up --grpc
+const SETUP_SNIPPET = `# 1. Obsergent: accept the gateway's OpenTelemetry (gRPC) and the proxy's spans
+obsergent up --grpc
 
 # 2. WSO2 API Platform gateway: gateway/configs/config.toml, then docker compose restart
 [tracing]
@@ -23,8 +23,8 @@ enabled = true
 endpoint = "host.docker.internal:4317"
 insecure = true
 
-# 3. Put AgentTrace's HTTP proxy in front of the gateway's MCP endpoint
-agenttrace proxy-http --name wso2 --url http://localhost:8080/<context>/mcp`;
+# 3. Put Obsergent's HTTP proxy in front of the gateway's MCP endpoint
+obsergent proxy-http --name wso2 --url http://localhost:8080/<context>/mcp`;
 
 function CallDetail({ call }: { call: GatewayCall }) {
   const detail = useQuery({ queryKey: ["gateway-call", call.activity_id], queryFn: () => api.gatewayCall(call.activity_id) });
@@ -32,7 +32,7 @@ function CallDetail({ call }: { call: GatewayCall }) {
     <QueryState query={detail}>{(d) => (
       <div className="col">
         <dl className="kv"><dt>Gateway call id</dt><dd className="mono">{call.activity_id}</dd><dt>Application key</dt><dd className="mono">{call.consumer_key ?? "-"}</dd>
-          <dt>Matched to the agent's request by</dt><dd>{call.correlation === "trace" ? "the same conversation (the gateway continued it)" : call.correlation === "activity" ? "the gateway's call id" : "nothing: this request did not go through AgentTrace's proxy"}</dd></dl>
+          <dt>Matched to the agent's request by</dt><dd>{call.correlation === "trace" ? "the same conversation (the gateway continued it)" : call.correlation === "activity" ? "the gateway's call id" : "nothing: this request did not go through Obsergent's proxy"}</dd></dl>
         <table><thead><tr><th>Gateway span</th><th className="num">Duration</th></tr></thead>
           <tbody>{d.spans.map((s) => <tr key={s.span_id}><td>{s.name}</td><td className="num">{formatMs(s.duration_ms)}</td></tr>)}</tbody></table>
       </div>)}
@@ -79,13 +79,13 @@ export function Gateway() {
           <Card>
             <div className="row wrap spread">
               <div className="row"><span className="dot" style={{ background: g.receiving ? "var(--ok)" : "var(--warn)" }} />
-                <strong>{g.receiving ? "The gateway is reporting to AgentTrace" : "The gateway has not reported anything yet"}</strong>
+                <strong>{g.receiving ? "The gateway is reporting to Obsergent" : "The gateway has not reported anything yet"}</strong>
                 {g.last_seen_ns && <span className="muted">last span {timeAgo(g.last_seen_ns)}</span>}</div>
               <span className="muted">{g.calls_total} request{g.calls_total === 1 ? "" : "s"} through the gateway in this period</span>
             </div>
             {!g.receiving && (
               <div className="col" style={{ marginTop: 12 }}>
-                <p style={{ margin: 0 }}>AgentTrace can show what the gateway does with each call once the gateway sends its OpenTelemetry traces here and the proxy sits in front of it:</p>
+                <p style={{ margin: 0 }}>Obsergent can show what the gateway does with each call once the gateway sends its OpenTelemetry traces here and the proxy sits in front of it:</p>
                 <pre className="code mono">{SETUP_SNIPPET}</pre><div><CopyButton text={SETUP_SNIPPET} label="Copy steps" /></div>
               </div>)}
           </Card>

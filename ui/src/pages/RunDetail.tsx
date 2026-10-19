@@ -115,7 +115,7 @@ export function RunDetail() {
 
       {tab === "conversation" && (
         <QueryState query={conversation} empty={{ when: (c) => c.messages.length === 0, title: "No model calls in this run",
-          hint: <p>The conversation comes from the agent-side recording (<code>agenttrace.sdk.init()</code>). A run recorded only through the proxy has MCP calls but no model messages.</p> }}>
+          hint: <p>The conversation comes from the agent-side recording (<code>obsergent.sdk.init()</code>). A run recorded only through the proxy has MCP calls but no model messages.</p> }}>
           {(c) => <><div className="row wrap muted" style={{ marginBottom: 12, gap: 16 }}><span>{c.summary.calls} model call(s)</span><span>{c.summary.models.join(", ")}</span><span>{formatCount(c.summary.total_tokens)} tokens</span><span>{formatMs(c.summary.latency_ms)} in the model</span></div><ConversationView messages={c.messages} runId={id} /></>}
         </QueryState>
       )}

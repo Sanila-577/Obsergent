@@ -1,4 +1,4 @@
-# AgentTrace: the commands you run FROM THIS REPOSITORY, in one place.   `make help` lists them.
+# Obsergent: the commands you run FROM THIS REPOSITORY, in one place.   `make help` lists them.
 #
 # The WSO2 gateway is a separate repository (github.com/wso2/api-platform): its commands (git clone, setup.sh,
 # docker compose) are typed inside that repository, see README section 4. Nothing here touches it.
@@ -13,14 +13,14 @@ SHELL := /bin/bash
 VENV_BIN          := $(if $(VIRTUAL_ENV),$(VIRTUAL_ENV)/bin,.venv/bin)
 EXTRAS            ?= dev,langchain,examples,grpc
 
-# Ports, addresses and the database file are NOT set here: they live in config.yaml (read by src/agenttrace/config.py).
-# `agenttrace config` prints what is in use, e.g. `agenttrace config server.port`.
+# Ports, addresses and the database file are NOT set here: they live in config.yaml (read by src/obsergent/config.py).
+# `obsergent config` prints what is in use, e.g. `obsergent config server.port`.
 
 .DEFAULT_GOAL := help
 
 .PHONY: help
 help:  ## show this list
-	@echo "AgentTrace: make <target>"; echo
+	@echo "Obsergent: make <target>"; echo
 	@awk 'BEGIN{FS=":.*## "} /^##@/{printf "\n%s\n", substr($$0,5)} /^[a-zA-Z0-9_-]+:.*## /{printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 ##@ Install and build (once)
@@ -30,47 +30,47 @@ install:  ## uv venv (if no environment is active or present) + uv pip install -
 	uv pip install -e ".[$(EXTRAS)]"
 ui-install:  ## UI dependencies (needs Node.js 20+)
 	cd ui && npm install
-ui-build:  ## build the web UI into src/agenttrace/server/static/
+ui-build:  ## build the web UI into src/obsergent/server/static/
 	cd ui && npm run build
 env:  ## create .env (language model settings) from .env.example if it does not exist
 	test -f .env || cp .env.example .env
 	@echo ".env is ready: edit the LLM_* lines to choose the model (Ollama by default)"
 setup: install ui-install ui-build env  ## all of the above
 
-##@ Run AgentTrace
+##@ Run Obsergent
 .PHONY: up up-grpc free-ports
-# free-ports: stop whatever listens on the ports AgentTrace is about to use (server.port, and server.grpc_port), for
-# example an `agenttrace up` you started earlier. The ports come from config.yaml.
+# free-ports: stop whatever listens on the ports Obsergent is about to use (server.port, and server.grpc_port), for
+# example an `obsergent up` you started earlier. The ports come from config.yaml.
 define kill_port
 pids=$$(lsof -ti tcp:$(1) -sTCP:LISTEN 2>/dev/null); if [ -n "$$pids" ]; then echo "port $(1) is in use: stopping $$pids"; kill $$pids; sleep 1; fi
 endef
-free-ports:  ## stop whatever listens on AgentTrace's server and gRPC ports (done automatically by up and up-grpc)
-	@$(call kill_port,$$($(VENV_BIN)/agenttrace config server.port))
-	@$(call kill_port,$$($(VENV_BIN)/agenttrace config server.grpc_port))
+free-ports:  ## stop whatever listens on Obsergent's server and gRPC ports (done automatically by up and up-grpc)
+	@$(call kill_port,$$($(VENV_BIN)/obsergent config server.port))
+	@$(call kill_port,$$($(VENV_BIN)/obsergent config server.grpc_port))
 up:  ## the server + web UI at http://127.0.0.1:7318 (first stops anything already on that port)
-	@$(call kill_port,$$($(VENV_BIN)/agenttrace config server.port))
-	$(VENV_BIN)/agenttrace up
+	@$(call kill_port,$$($(VENV_BIN)/obsergent config server.port))
+	$(VENV_BIN)/obsergent up
 up-grpc:  ## same, plus the gRPC receiver on :4317 (first stops anything on either port)
 	@$(MAKE) --no-print-directory free-ports
-	$(VENV_BIN)/agenttrace up --grpc
+	$(VENV_BIN)/obsergent up --grpc
 
 ##@ Look at what was recorded (terminal; the web UI shows the same)
 .PHONY: traces show sessions drift config prices prices-status
 traces:  ## list the recorded runs, newest first (LIMIT=N for more, default 20)
-	$(VENV_BIN)/agenttrace traces --limit $(or $(LIMIT),20)
+	$(VENV_BIN)/obsergent traces --limit $(or $(LIMIT),20)
 show:  ## one run as a span tree: make show ID=<first characters of a run id from `make traces`>
 	@test -n "$(ID)" || { echo "usage: make show ID=<run id or its first characters>  (ids are listed by: make traces)"; exit 1; }
-	$(VENV_BIN)/agenttrace show $(ID)
+	$(VENV_BIN)/obsergent show $(ID)
 sessions:  ## list proxy sessions (one per proxy process, e.g. what Claude Desktop did)
-	$(VENV_BIN)/agenttrace sessions
+	$(VENV_BIN)/obsergent sessions
 drift:  ## MCP servers whose tool descriptions changed since first seen
-	$(VENV_BIN)/agenttrace drift
+	$(VENV_BIN)/obsergent drift
 prices:  ## download the model price lists now (they also refresh by themselves while `make up` runs)
-	$(VENV_BIN)/agenttrace prices refresh
+	$(VENV_BIN)/obsergent prices refresh
 prices-status:  ## when the price lists were last downloaded
-	$(VENV_BIN)/agenttrace prices status
+	$(VENV_BIN)/obsergent prices status
 config:  ## the settings in use (config.yaml + environment)
-	$(VENV_BIN)/agenttrace config
+	$(VENV_BIN)/obsergent config
 
 ##@ With a WSO2 gateway (it must be running: README section 4)
 .PHONY: mcp-http register register-deny proxy traffic
@@ -80,18 +80,56 @@ register:  ## register it in the gateway (needs WSO2AP_GW_PASSWORD in the enviro
 	$(VENV_BIN)/python scripts/wso2_gateway.py register
 register-deny:  ## same, plus the mcp-acl-list policy: only search_books is allowed
 	$(VENV_BIN)/python scripts/wso2_gateway.py register --deny-price
-proxy:  ## AgentTrace's recording proxy in front of the gateway (clients use http://127.0.0.1:7319/mcp/wso2)
-	$(VENV_BIN)/agenttrace proxy-http
+proxy:  ## Obsergent's recording proxy in front of the gateway (clients use http://127.0.0.1:7319/mcp/wso2)
+	$(VENV_BIN)/obsergent proxy-http
 traffic:  ## plain MCP test calls through the proxy (no agent, no model)
 	$(VENV_BIN)/python scripts/wso2_gateway.py traffic
 
+##@ Run everything in the background (one terminal is enough)
+.PHONY: start stop status logs up-bg up-grpc-bg mcp-http-bg proxy-bg
+RUN_DIR := .run
+# spawn <name>,<command>: start it detached (nohup), log to .run/<name>.log, remember the pid in .run/<name>.pid
+define spawn
+mkdir -p $(RUN_DIR); if [ -f $(RUN_DIR)/$(1).pid ] && kill -0 $$(cat $(RUN_DIR)/$(1).pid) 2>/dev/null; then echo "$(1) is already running (pid $$(cat $(RUN_DIR)/$(1).pid))"; else nohup $(2) > $(RUN_DIR)/$(1).log 2>&1 & echo $$! > $(RUN_DIR)/$(1).pid; echo "started $(1)  (log: $(RUN_DIR)/$(1).log)"; fi
+endef
+# wait_for <name>,<url>: wait up to 30 seconds until the address answers
+define wait_for
+for i in $$(seq 30); do curl -s -o /dev/null $(2) && { echo "$(1) is up"; break; }; sleep 1; done
+endef
+up-bg: free-ports  ## the server + web UI, detached (log: .run/obsergent.log)
+	@$(call spawn,obsergent,$(VENV_BIN)/obsergent up)
+	@$(call wait_for,Obsergent,http://127.0.0.1:$$($(VENV_BIN)/obsergent config server.port)/health)
+up-grpc-bg: free-ports  ## the server + web UI + gRPC receiver, detached (log: .run/obsergent.log)
+	@$(call spawn,obsergent,$(VENV_BIN)/obsergent up --grpc)
+	@$(call wait_for,Obsergent,http://127.0.0.1:$$($(VENV_BIN)/obsergent config server.port)/health)
+mcp-http-bg:  ## the Bookshop MCP server over HTTP, detached (log: .run/mcp-http.log)
+	@$(call kill_port,$$($(VENV_BIN)/obsergent config bookshop.http_port))
+	@$(call spawn,mcp-http,$(VENV_BIN)/python examples/bookshop/bookshop_http.py --host 0.0.0.0)
+	@$(call wait_for,MCP server,http://127.0.0.1:$$($(VENV_BIN)/obsergent config bookshop.http_port)/mcp)
+proxy-bg:  ## Obsergent's recording proxy in front of the gateway, detached (log: .run/proxy.log)
+	@$(call kill_port,$$($(VENV_BIN)/obsergent config proxy.port))
+	@$(call spawn,proxy,$(VENV_BIN)/obsergent proxy-http)
+	@$(call wait_for,Proxy,http://127.0.0.1:$$($(VENV_BIN)/obsergent config proxy.port)/mcp/x)
+start: up-grpc-bg mcp-http-bg  ## server+gRPC, MCP server, registration in the gateway, proxy: all detached (gateway: docker compose, see README)
+	@if [ -n "$$WSO2AP_GW_PASSWORD" ]; then $(MAKE) --no-print-directory register; else echo "skipped register: export WSO2AP_GW_PASSWORD first, then run: make register"; fi
+	@$(MAKE) --no-print-directory proxy-bg
+status:  ## what runs in the background
+	@for f in $(RUN_DIR)/*.pid; do [ -f "$$f" ] || continue; n=$$(basename $$f .pid); if kill -0 $$(cat $$f) 2>/dev/null; then echo "running  $$n (pid $$(cat $$f))"; else echo "stopped  $$n"; fi; done; ls $(RUN_DIR)/*.pid >/dev/null 2>&1 || echo "nothing started with make start"
+logs:  ## follow the logs of everything started in the background (Ctrl+C stops following, not the programs)
+	@tail -n 20 -F $(RUN_DIR)/*.log
+stop:  ## stop everything started in the background (the WSO2 gateway is stopped with docker compose down in its folder)
+	@for f in $(RUN_DIR)/*.pid; do [ -f "$$f" ] || continue; kill $$(cat $$f) 2>/dev/null && echo "stopped $$(basename $$f .pid)"; rm -f $$f; done; true
+	@$(MAKE) --no-print-directory free-ports
+	@$(call kill_port,$$($(VENV_BIN)/obsergent config proxy.port))
+	@$(call kill_port,$$($(VENV_BIN)/obsergent config bookshop.http_port))
+
 ##@ Reset
 .PHONY: reset-db clean
-reset-db:  ## EMPTY AgentTrace's database (config.yaml: storage.path); stop `agenttrace up` first
-	db=$$($(VENV_BIN)/agenttrace config storage.path); db=$${db/#\~/$$HOME}; rm -f "$$db" "$$db-wal" "$$db-shm"
+reset-db:  ## EMPTY Obsergent's database (config.yaml: storage.path); stop Obsergent first (make stop)
+	db=$$($(VENV_BIN)/obsergent config storage.path); db=$${db/#\~/$$HOME}; rm -f "$$db" "$$db-wal" "$$db-shm"
 	@echo "database emptied"
-clean:  ## remove the built UI and caches (not the environment, not the database)
-	rm -rf .pytest_cache .ruff_cache ui/node_modules/.vite src/agenttrace/server/static/*
+clean:  ## remove the built UI, caches and background logs (not the environment, not the database)
+	rm -rf .pytest_cache .ruff_cache ui/node_modules/.vite src/obsergent/server/static/* $(RUN_DIR)
 	find . -name __pycache__ -not -path "./.venv/*" -not -path "./ui/node_modules/*" -prune -exec rm -rf {} +
 
 ##@ Checks

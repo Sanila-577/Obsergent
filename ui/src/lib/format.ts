@@ -66,21 +66,23 @@ export function prettyJson(text: string): { pretty: string; isJson: boolean } {
   return { pretty: text, isJson: false };
 }
 
-/** Dollars for people: 0 -> "$0", 0.004 -> "< 1¢", 0.42 -> "$0.42", 12.5 -> "$12.50", 2400 -> "$2,400". Missing -> "-". */
+/**
+ * Dollars, always in dollars (never cents), with enough decimals to show two significant digits of small amounts:
+ * 0 -> "$0", 0.00021 -> "$0.00021", 0.0369 -> "$0.037", 0.42 -> "$0.42", 12.5 -> "$12.50", 2400 -> "$2,400". Missing -> "-".
+ */
 export function formatMoney(usd: number | null | undefined): string {
   if (usd === null || usd === undefined || Number.isNaN(usd)) return "-";
   if (usd === 0) return "$0";
-  if (usd < 0.01) return "< 1¢";
-  if (usd < 1000) return `$${usd.toFixed(2)}`;
-  return `$${Math.round(usd).toLocaleString()}`;
+  if (usd >= 1000) return `$${Math.round(usd).toLocaleString()}`;
+  if (usd >= 1) return `$${usd.toFixed(2)}`;
+  const decimals = Math.min(10, Math.max(2, -Math.floor(Math.log10(usd)) + 1));
+  return `$${usd.toFixed(decimals)}`;
 }
 
-/** The same amount in a sentence: "less than 1 cent", "42 cents", "$1.20". */
+/** The same amount in a sentence: always dollars, e.g. "$0.00021", "$0.42", "$1.20". */
 export function moneyInWords(usd: number | null | undefined): string {
   if (usd === null || usd === undefined || Number.isNaN(usd)) return "an unknown amount";
   if (usd === 0) return "nothing";
-  if (usd < 0.01) return "less than 1 cent";
-  if (usd < 1) return `${Math.round(usd * 100)} cent${Math.round(usd * 100) === 1 ? "" : "s"}`;
   return formatMoney(usd);
 }
 

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { shortId, formatMs } from "../lib/format";
-import { useSettings } from "../lib/state";
 
 interface Item {
   group: string;
@@ -15,39 +14,44 @@ interface Item {
 
 export const PAGES: Item[] = [
   { group: "Pages", label: "Overview", to: "/", hint: "g o" },
-  { group: "Pages", label: "Conversations", to: "/runs", hint: "g r" },
-  { group: "Pages", label: "App activity", to: "/sessions", hint: "g s" },
-  { group: "Pages", label: "Tools", to: "/servers", hint: "g t" },
-  { group: "Pages", label: "Spending: what the models cost", to: "/spending" },
+  { group: "Pages", label: "Conversations: the questions you asked", to: "/conversations", hint: "g c" },
+  { group: "Pages", label: "Agents", to: "/agents", hint: "g a" },
+  { group: "Pages", label: "MCPs: tool servers and their tools", to: "/mcps", hint: "g m" },
+  { group: "Pages", label: "Models: the AI models used", to: "/models", hint: "g d" },
+  { group: "Pages", label: "Spending: what the models cost", to: "/spending", hint: "g s" },
   { group: "Pages", label: "Things to check", to: "/findings", hint: "g f" },
   { group: "Pages", label: "Gateway guard", to: "/gateway", hint: "g w" },
-  { group: "Pages", label: "Connections", to: "/map", hint: "g m" },
+  { group: "Pages", label: "Connections", to: "/map", hint: "g n" },
+  { group: "Pages", label: "App activity", to: "/sessions" },
+  { group: "Pages", label: "All activity", to: "/runs", hint: "g r" },
   { group: "Pages", label: "Compare two conversations", to: "/compare" },
-  { group: "Pages", label: "About: AgentTrace vs Langfuse", to: "/about" },
+  { group: "Pages", label: "About Obsergent", to: "/about" },
 ];
 
 export function CommandPalette({ onClose }: { onClose: () => void }) {
-  const { hours } = useSettings();
   const navigate = useNavigate();
   const [text, setText] = useState("");
   const [cursor, setCursor] = useState(0);
   const input = useRef<HTMLInputElement>(null);
-  const runs = useQuery({ queryKey: ["palette-runs"], queryFn: () => api.traces({ limit: 15 }) });
-  const tools = useQuery({ queryKey: ["tools", hours], queryFn: () => api.tools(hours) });
-  const servers = useQuery({ queryKey: ["servers"], queryFn: api.servers });
+  const questions = useQuery({ queryKey: ["palette-questions"], queryFn: () => api.queries({ limit: 15 }) });
+  const agents = useQuery({ queryKey: ["agents"], queryFn: api.agents });
+  const models = useQuery({ queryKey: ["models"], queryFn: api.models });
+  const mcps = useQuery({ queryKey: ["mcps"], queryFn: api.mcps });
 
   useEffect(() => input.current?.focus(), []);
 
   const items = useMemo<Item[]>(() => {
     const all: Item[] = [
       ...PAGES,
-      ...(runs.data ?? []).map((r) => ({ group: "Recent conversations", label: r.question || r.root_name, hint: `${shortId(r.trace_id)} · ${formatMs(r.duration_ms)}`, to: `/runs/${r.trace_id}` })),
-      ...(tools.data ?? []).map((t) => ({ group: "Tools", label: String(t.tool), hint: t.server ?? "", to: `/runs?tool=${t.tool}` })),
-      ...(servers.data ?? []).map((s) => ({ group: "Servers", label: s.server_name, hint: `${s.versions} version(s)`, to: `/servers?server=${s.server_name}` })),
+      ...(questions.data ?? []).map((q) => ({ group: "Questions", label: q.question || q.root_name, hint: `${shortId(q.trace_id)} · ${formatMs(q.duration_ms)}`, to: `/conversations?q=${q.trace_id}` })),
+      ...(agents.data ?? []).map((a) => ({ group: "Agents", label: a.name, hint: `${a.questions} question(s)`, to: `/agents?agent=${encodeURIComponent(a.name)}` })),
+      ...(models.data ?? []).map((m) => ({ group: "Models", label: m.model, hint: m.provider ?? "", to: `/models?model=${encodeURIComponent(m.model)}` })),
+      ...(mcps.data ?? []).map((s) => ({ group: "MCP servers", label: s.name, hint: `${s.tool_count} tool(s)`, to: `/mcps?server=${encodeURIComponent(s.name)}` })),
+      ...(mcps.data ?? []).flatMap((s) => s.tools.map((t) => ({ group: "Tools", label: t.name, hint: s.name, to: `/mcps?server=${encodeURIComponent(s.name)}&tool=${encodeURIComponent(t.name)}` }))),
     ];
     const needle = text.trim().toLowerCase();
     return needle ? all.filter((item) => `${item.label} ${item.hint ?? ""} ${item.group}`.toLowerCase().includes(needle)) : all;
-  }, [text, runs.data, tools.data, servers.data]);
+  }, [text, questions.data, agents.data, models.data, mcps.data]);
 
   const go = (item: Item | undefined) => {
     if (!item) return;
@@ -66,7 +70,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   return (
     <div className="palette-overlay" onMouseDown={onClose} role="dialog" aria-label="Command palette">
       <div className="palette" onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKey}>
-        <input ref={input} value={text} placeholder="Jump to a page, conversation or tool…" onChange={(e) => { setText(e.target.value); setCursor(0); }} aria-label="Search" />
+        <input ref={input} value={text} placeholder="Jump to a page, question, agent, model or tool…" onChange={(e) => { setText(e.target.value); setCursor(0); }} aria-label="Search" />
         <ul role="listbox">
           {items.length === 0 && <li className="muted">Nothing matches “{text}”</li>}
           {items.slice(0, 40).map((item, index) => {

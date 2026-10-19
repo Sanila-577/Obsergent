@@ -11,4 +11,5 @@ dist/
 uv.lock
 # the web UI: its dependencies and its build output (the build is copied into the Python package)
 ui/node_modules/
-src/agenttrace/server/static/*
+src/obsergent/server/static/*
+.run/

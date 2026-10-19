@@ -75,7 +75,7 @@ its tags: `gen_ai.tool.name`, `mcp.tool.arguments`, `mcp.result`.
 
 The same spans could go to Jaeger, Langfuse **and** your SQLite tracker at once:
 add more span processors to the provider (`provider.add_span_processor(...)`). That
-is how AgentTrace will coexist with other tools.
+is how Obsergent will coexist with other tools.
 
 ## Try this
 

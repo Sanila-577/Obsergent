@@ -1,0 +1,64 @@
+/* The glass look. Loaded last, so it restyles the components: translucent panels with a blur, a soft mesh of colour behind
+   everything, a thin light border and an inner highlight. Blur is used only on a few large panels (never on table rows).
+   Fallbacks: a solid panel where `backdrop-filter` is missing, when the person asks for less transparency, or for less motion. */
+
+html { background: var(--bg); }
+body {
+  background:
+    radial-gradient(60rem 40rem at 8% -10%, var(--mesh-a), transparent 60%),
+    radial-gradient(50rem 36rem at 105% 8%, var(--mesh-b), transparent 60%),
+    radial-gradient(48rem 34rem at 50% 115%, var(--mesh-c), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+.rail, .topbar, .card, .tile, .first-run, .palette, .help-bubble, .q-card, .gcard, .flow-panel, .about-step, .peaks-tip {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+}
+.card, .tile, .first-run, .q-card, .gcard, .flow-panel, .about-step { border-radius: var(--radius); }
+.rail { border-right: 1px solid var(--glass-border); border-radius: 0; }
+.topbar { border-bottom: 1px solid var(--glass-border); border-radius: 0; }
+.palette, .help-bubble, .peaks-tip { background: var(--glass-strong); }
+/* tables sit on a panel; their sticky header must not be a second layer of blur */
+th { background: transparent; backdrop-filter: none; }
+.card.flush th { background: color-mix(in srgb, var(--panel) 70%, transparent); }
+
+/* things that can be clicked lift a little and brighten their border */
+.tile, .q-card, .gcard, a.tile { transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
+a.tile:hover, .q-card:hover, .gcard:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 60%, var(--glass-border)); }
+.nav-link { transition: background .16s ease, color .16s ease; border-radius: 10px; }
+.nav-link.active { background: var(--accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
+button, .btn, input, select { border-color: var(--glass-border); background: color-mix(in srgb, var(--panel-2) 70%, transparent); }
+button.primary { background: var(--accent); }
+button:hover:not(:disabled), .btn:hover { border-color: var(--accent); }
+.seg { border-color: var(--glass-border); background: color-mix(in srgb, var(--panel-2) 55%, transparent); }
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; }
+  .rail { flex-direction: row; overflow-x: auto; padding: 8px; border-right: none; border-bottom: 1px solid var(--glass-border); }
+  .rail .brand, .rail .rail-foot { display: none; }
+  .nav-link { white-space: nowrap; }
+  .content { padding: 14px; }
+}
+
+/* no blur available: solid panels with the same borders */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .rail, .topbar, .card, .tile, .first-run, .palette, .help-bubble, .q-card, .gcard, .flow-panel, .about-step, .peaks-tip { background: var(--panel); }
+}
+/* the person asked for less transparency: solid panels and no mesh */
+@media (prefers-reduced-transparency: reduce) {
+  .rail, .topbar, .card, .tile, .first-run, .palette, .help-bubble, .q-card, .gcard, .flow-panel, .about-step, .peaks-tip {
+    background: var(--panel); -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+  body { background: var(--bg); }
+}
+/* the person asked for less motion */
+@media (prefers-reduced-motion: reduce) {
+  .tile, .q-card, .gcard, .nav-link { transition: none; }
+  a.tile:hover, .q-card:hover, .gcard:hover { transform: none; }
+  .flow-edge-animated, .live-dot.on, .skeleton { animation: none !important; }
+}

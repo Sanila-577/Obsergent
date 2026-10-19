@@ -1,4 +1,4 @@
-// Shapes returned by the AgentTrace REST API (src/agenttrace/server/app.py). Kept in one place so a change in
+// Shapes returned by the Obsergent REST API (src/obsergent/server/app.py). Kept in one place so a change in
 // the backend shows up as a type error here, not as a blank screen.
 
 export type Attributes = Record<string, unknown>;
@@ -112,6 +112,7 @@ export interface ToolStats extends LatencySummary {
 export interface ModelUsage {
   cost_usd?: number | null;
   cost_status?: string | null;
+  /** The one name shown for the model (no version date). */
   model: string;
   provider: string | null;
   calls: number;
@@ -121,11 +122,212 @@ export interface ModelUsage {
   avg_ms: number;
   max_ms: number;
   p95_ms: number;
+  /** The raw names recorded for this model (the dated and the undated one), shown in Detailed mode. */
+  versions: string[];
+}
+
+/** What the price lists know about a model besides its price. */
+export interface ModelInfo {
+  name?: string | null;
+  family?: string | null;
+  context?: number | null;
+  max_output?: number | null;
+  input_modalities?: string[];
+  output_modalities?: string[];
+  tool_call?: boolean | null;
+  reasoning?: boolean | null;
+  open_weights?: boolean | null;
+  release_date?: string | null;
+  knowledge?: string | null;
+  provider_name?: string | null;
+}
+
+/** One entry of the Models page (`GET /api/models`). */
+export interface ModelEntry extends ModelUsage {
+  display: string;
+  cached_tokens: number;
+  reasoning_tokens: number;
+  usd: number;
+  exact_usd: number;
+  estimated_usd: number;
+  unpriced: number;
+  errors: number;
+  error_rate: number;
+  questions: number;
+  first_ns: number;
+  last_ns: number;
+  status: "priced" | "local" | "unpriced";
+  price: { input: number | null; output: number | null; cache_read: number | null; cache_write: number | null;
+           source: string; confidence: string; since_ns: number } | null;
+  info: ModelInfo;
+}
+
+/** A question someone asked an agent, as a card (`GET /api/queries`). */
+export interface QueryCard {
+  trace_id: string;
+  question: string;
+  answer: string;
+  started_ns: number;
+  duration_ms: number;
+  agent: string;
+  models: string[];
+  tools: string[];
+  model_calls: number;
+  tool_calls: number;
+  exchanges: number;
+  status: "ok" | "problem";
+  problem: string;
+  user_id: string | null;
+  session: string | null;
+  root_name: string;
+  cost: CostTotals;
+}
+
+/** One message of a question's thread. */
+export interface ThreadItem {
+  kind: "question" | "model" | "answer" | "tool";
+  text?: string;
+  step?: number;
+  model?: string;
+  raw_model?: string | null;
+  provider?: string | null;
+  start_ns: number;
+  duration_ms?: number | null;
+  span_id?: string | null;
+  mcp_span_id?: string | null;
+  prompt_tokens?: number | null;
+  completion_tokens?: number | null;
+  status?: string;
+  message?: string;
+  cost?: CostInfo | null;
+  requests?: string[];
+  name?: string;
+  arguments?: string;
+  result?: string;
+  decision?: string | null;
+  server?: string | null;
+}
+
+export interface QueryThread extends QueryCard {
+  thread: ThreadItem[];
+  tools_offered: string[];
+}
+
+/** The peaks chart: one point per question, or time slots when there are many. */
+export interface QueryTimeline {
+  mode: "questions" | "slots";
+  window_hours?: number;
+  points: {
+    trace_id: string;
+    start_ns: number;
+    end_ns?: number;
+    question: string;
+    exchanges: number;
+    model_calls?: number;
+    tool_calls?: number;
+    cost_usd?: number | null;
+    duration_ms?: number;
+    status?: string;
+    count?: number;
+    questions?: string[];
+  }[];
+}
+
+export interface AgentEntry {
+  name: string;
+  framework: string;
+  questions: number;
+  model_calls: number;
+  tool_calls: number;
+  models: string[];
+  tools: string[];
+  usd: number;
+  exchanges: number;
+  avg_exchanges: number;
+  problems: number;
+  first_ns: number;
+  last_ns: number;
+  latest_question: string;
+}
+
+export interface GraphNode {
+  id: string;
+  kind: "start" | "end" | "step" | "model" | "tool" | "mcp" | "gateway";
+  label: string;
+  calls: number;
+  total_ms: number;
+  avg_ms: number | null;
+  errors: number;
+  cost_usd: number;
+  traces: string[];
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+  calls: number;
+  total_ms: number;
+  avg_ms: number | null;
+  errors: number;
+}
+
+export interface AgentGraph {
+  agent: string;
+  framework: string;
+  approximate: boolean;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+export interface McpParameter {
+  name: string;
+  type: string;
+  required: boolean;
+  description: string;
+  choices: string[];
+}
+
+export interface McpTool extends LatencySummary {
+  name: string;
+  description: string;
+  parameters: McpParameter[];
+  schema: unknown;
+  risky: boolean;
+  calls: number;
+  errors: number;
+  last_used_ns: number | null;
+  used: boolean;
+  changed: boolean;
+  removed?: boolean;
+  decisions: string[];
+}
+
+export interface McpServer {
+  name: string;
+  transport: "program" | "web";
+  command: string | null;
+  via_gateway: boolean;
+  tools: McpTool[];
+  tool_count: number;
+  calls: number;
+  errors: number;
+  error_rate: number;
+  last_seen_ns: number | null;
+  versions: number;
+  changes: number;
+  changed: boolean;
 }
 
 export interface Overview {
+  /** Questions asked in the window (agent runs with a model call). */
+  discussions: number;
+  /** MCP servers, and the distinct tools they offer. */
+  mcps: number;
+  tools_total: number;
+  latest_queries: QueryCard[];
+  timeline: QueryTimeline;
   window_hours: number;
-  counts: { runs: number; spans: number; tool_calls: number; errors: number; llm_calls: number; tokens: number };
+  counts: { runs: number; spans: number; tool_calls: number; errors: number; llm_calls: number; tokens: number; questions: number };
   error_rate: number;
   tool_latency: LatencySummary;
   decisions: Record<string, number>;
@@ -226,9 +428,12 @@ export interface SnapshotsResponse {
 
 export interface TopologyNode {
   id: string;
-  kind: "client" | "server" | "tool";
+  kind: "client" | "gateway" | "server" | "tool";
   label: string;
   via_gateway: boolean;
+  /** Servers only: how many tools were used on it, and whether they are drawn. */
+  tool_count: number | null;
+  expanded: boolean;
 }
 
 export interface Topology {

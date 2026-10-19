@@ -1,7 +1,7 @@
 """TEST ONLY: fill a throw-away database so the browser tests (ui/e2e, Playwright) have something to click through.
 Not for users: the app shows only what your own agents, MCP servers and apps record.
 
-    AGENTTRACE_DB=/tmp/e2e.db python ui/e2e/seed_test_db.py
+    OBSERGENT_DB=/tmp/e2e.db python ui/e2e/seed_test_db.py
 
 The data is built from REAL captured traces (tests/fixtures: an Ollama agent run and a WSO2 API Manager gateway
 trace): they are copied many times with new ids, spread over the last hours, with some variation. It also adds a loop
@@ -14,11 +14,11 @@ import time
 import uuid
 from pathlib import Path
 
-from agenttrace import config
-from agenttrace.ingest.pipeline import ingest_spans
-from agenttrace.models import Span
-from agenttrace.server import price_sync
-from agenttrace.storage.sqlite import SQLiteStorage
+from obsergent import config
+from obsergent.ingest.pipeline import ingest_spans
+from obsergent.models import Span
+from obsergent.server import price_sync
+from obsergent.storage.sqlite import SQLiteStorage
 
 FIXTURES = Path(__file__).resolve().parent.parent.parent / "tests" / "fixtures"
 MINUTE = 60 * 1_000_000_000
@@ -44,11 +44,25 @@ def clone(spans: list[Span], when_ns: int, rng: random.Random, jitter: float = 0
         new.parent_span_id = fresh(span.parent_span_id, 16) if span.parent_span_id else None
         new.start_ns = when_ns - int((max(s.end_ns for s in spans) - span.start_ns) * scale)
         new.end_ns = new.start_ns + int((span.end_ns - span.start_ns) * scale)
-        for key in ("agenttrace.session.id", "gateway.activity_id", "span.activity.id", "mcp.session.hash"):
+        for key in ("obsergent.session.id", "gateway.activity_id", "span.activity.id", "mcp.session.hash"):
             if key in new.attributes:  # these ids must stay consistent between the spans that share them
                 new.attributes[key] = fresh(str(span.attributes[key]), 36 if "id" in key else 12)
         copies.append(new)
     return copies
+
+
+# Four different questions, asked in turn, so the Conversations page has distinct questions to choose from.
+QUESTIONS = ("Do you have a Python book in stock, and how much is it?", "Which books by Eric Matthes do you sell?",
+             "Is Fluent Python cheaper than Python Crash Course?", "What is the cheapest book you have?")
+
+
+def ask(spans: list[Span], question: str) -> list[Span]:
+    """The same run, as if this question had been asked (every model call's first user message is replaced)."""
+    for span in spans:
+        for key, value in list(span.attributes.items()):
+            if key.startswith("llm.input_messages.") and key.endswith(".message.role") and value == "user":
+                span.attributes[key.replace(".role", ".content")] = question
+    return spans
 
 
 def loop_run(when_ns: int, rng: random.Random) -> list[Span]:
@@ -59,7 +73,7 @@ def loop_run(when_ns: int, rng: random.Random) -> list[Span]:
                   attributes={})]
     for i in range(5):
         start = when_ns - (5 - i) * 400_000_000
-        spans.append(Span(trace, uuid.uuid4().hex[:16], root, "tools/call search_tickets", "CLIENT", "agenttrace-proxy",
+        spans.append(Span(trace, uuid.uuid4().hex[:16], root, "tools/call search_tickets", "CLIENT", "obsergent-proxy",
                           start, start + int(rng.uniform(80, 140) * 1e6), attributes={
                               "mcp.method.name": "tools/call", "gen_ai.tool.name": "search_tickets",
                               "mcp.server.name": "tickets", "mcp.tool.arguments": '{"query": "refund"}',
@@ -98,6 +112,8 @@ def seed_prices(store: SQLiteStorage, now: int) -> None:
         rows = price_sync.PARSERS[source](json.loads((folder / f"{source}.json").read_text()))
         store.save_prices(source, rows, now - 90 * MINUTE)
         store.save_sync(source, "", now - 90 * MINUTE, now - 5 * MINUTE, 1)
+        if source in price_sync.INFO_PARSERS:  # what the same download says about each model (context window, abilities...)
+            store.save_model_info(price_sync.INFO_PARSERS[source](json.loads((folder / f"{source}.json").read_text())))
 
 
 def tool(name: str, description: str, schema: dict | None = None) -> dict:
@@ -114,13 +130,18 @@ def main() -> None:
         gateway_by_trace.setdefault(span.trace_id, []).append(span)
 
     for i in range(24):  # agent runs over the last ~4 hours
-        ingest_spans(clone(agent_run, now - (i * 9 + rng.randint(1, 6)) * MINUTE, rng), store)
+        ingest_spans(ask(clone(agent_run, now - (i * 9 + rng.randint(1, 6)) * MINUTE, rng), QUESTIONS[i % 4]), store)
     seed_prices(store, now)
     for i in range(8):  # runs answered by hosted models, which cost money
         provider, model = (("openai", "gpt-4o-mini"), ("anthropic", "claude-sonnet-4-5"))[i % 2]
-        ingest_spans(hosted(clone(agent_run, now - (i * 17 + rng.randint(1, 8)) * MINUTE, rng), provider, model, 40), store)
+        run = hosted(clone(agent_run, now - (i * 17 + rng.randint(1, 8)) * MINUTE, rng), provider, model, 40)
+        if model == "gpt-4o-mini":  # OpenAI answers with the dated name of the model: the same model is recorded twice
+            for span in run[len(run) // 2:]:
+                if span.attributes.get("llm.model_name") == model:
+                    span.attributes["llm.model_name"] = "gpt-4o-mini-2024-07-18"
+        ingest_spans(ask(run, QUESTIONS[(i + 1) % 4]), store)
     for i in range(3):  # runs whose provider reported the exact cost (OpenRouter)
-        ingest_spans(routed(clone(agent_run, now - (i * 23 + rng.randint(1, 8)) * MINUTE, rng)), store)
+        ingest_spans(ask(routed(clone(agent_run, now - (i * 23 + rng.randint(1, 8)) * MINUTE, rng)), QUESTIONS[(i + 2) % 4]), store)
     for i in range(14):  # calls through the gateway: allowed ones mixed with refused ones
         for trace in sorted(gateway_by_trace.values(), key=lambda s: -len(s)):
             if len(trace) < 8 and rng.random() < 0.55:

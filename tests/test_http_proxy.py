@@ -9,7 +9,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from agenttrace.proxy.http import create_proxy_app
+from obsergent.proxy.http import create_proxy_app
 
 UPSTREAM = "http://upstream.test/mcp?token=SECRET"
 

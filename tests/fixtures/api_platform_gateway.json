@@ -183,8 +183,8 @@
  },
  {
   "attributes": {
-   "agenttrace.session.command": "http:localhost:8080/bookshop/mcp",
-   "agenttrace.session.id": "812a3cd566444dd296e79ec39cf07e48",
+   "obsergent.session.command": "http:localhost:8080/bookshop/mcp",
+   "obsergent.session.id": "812a3cd566444dd296e79ec39cf07e48",
    "gateway.decision": "denied",
    "gen_ai.operation.name": "execute_tool",
    "gen_ai.tool.name": "get_price_and_stock",
@@ -201,7 +201,7 @@
   "kind": "CLIENT",
   "name": "tools/call get_price_and_stock",
   "parent_span_id": null,
-  "service": "agenttrace-proxy",
+  "service": "obsergent-proxy",
   "span_id": "25f3a6da495e60e1",
   "start_ns": 1792299001294656000,
   "status_code": "ERROR",
@@ -414,8 +414,8 @@
  },
  {
   "attributes": {
-   "agenttrace.session.command": "http:localhost:8080/bookshop/mcp",
-   "agenttrace.session.id": "812a3cd566444dd296e79ec39cf07e48",
+   "obsergent.session.command": "http:localhost:8080/bookshop/mcp",
+   "obsergent.session.id": "812a3cd566444dd296e79ec39cf07e48",
    "gateway.decision": "allowed",
    "gen_ai.operation.name": "execute_tool",
    "gen_ai.tool.name": "search_books",
@@ -432,7 +432,7 @@
   "kind": "CLIENT",
   "name": "tools/call search_books",
   "parent_span_id": null,
-  "service": "agenttrace-proxy",
+  "service": "obsergent-proxy",
   "span_id": "bf41a627e8c9eaa5",
   "start_ns": 1792299001291921000,
   "status_code": "UNSET",
@@ -754,8 +754,8 @@
  },
  {
   "attributes": {
-   "agenttrace.session.command": "http:localhost:8080/bookshop/mcp",
-   "agenttrace.session.id": "812a3cd566444dd296e79ec39cf07e48",
+   "obsergent.session.command": "http:localhost:8080/bookshop/mcp",
+   "obsergent.session.id": "812a3cd566444dd296e79ec39cf07e48",
    "gateway.decision": "allowed",
    "http.response.status_code": 200,
    "jsonrpc.request.id": "2",
@@ -769,7 +769,7 @@
   "kind": "CLIENT",
   "name": "tools/list",
   "parent_span_id": null,
-  "service": "agenttrace-proxy",
+  "service": "obsergent-proxy",
   "span_id": "0ac0b67379dc3e38",
   "start_ns": 1792299001284849000,
   "status_code": "UNSET",

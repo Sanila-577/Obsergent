@@ -2,8 +2,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from agenttrace.server.app import create_app
-from agenttrace.storage.sqlite import SQLiteStorage
+from obsergent.server.app import create_app
+from obsergent.storage.sqlite import SQLiteStorage
 
 PAGES = ["/api/traces", "/api/sessions", "/api/servers", "/api/tools", "/api/topology", "/api/stats/overview",
          "/api/findings", "/api/gateway/summary", "/api/models"]
@@ -11,10 +11,10 @@ PAGES = ["/api/traces", "/api/sessions", "/api/servers", "/api/tools", "/api/top
 
 @pytest.fixture
 def client_after_reset(tmp_path):
-    path = tmp_path / "agenttrace.db"
+    path = tmp_path / "obsergent.db"
     client = TestClient(create_app(SQLiteStorage(path)))
     for suffix in ("", "-wal", "-shm"):  # what `make reset-db` does, while the server keeps running
-        (tmp_path / f"agenttrace.db{suffix}").unlink(missing_ok=True)
+        (tmp_path / f"obsergent.db{suffix}").unlink(missing_ok=True)
     return client
 
 

@@ -21,7 +21,7 @@ import sys
 import httpx
 
 # config.yaml: the gateway's addresses, the MCP server's name and path, ports.
-from agenttrace import config
+from obsergent import config
 
 # Name and version of the MCP proxy we create in the gateway (its path and the addresses come from config.yaml).
 NAME, VERSION = "bookshop", "v1.0"
@@ -98,7 +98,7 @@ def main() -> None:
     reg.add_argument("--deny-price", action="store_true",
                      help="add the mcp-acl-list policy so only search_books is allowed (get_price_and_stock is refused)")
     run = sub.add_parser("traffic", help="send test MCP traffic")
-    run.add_argument("--url", default=None, help="MCP URL (default: through the AgentTrace proxy, from config.yaml, "
+    run.add_argument("--url", default=None, help="MCP URL (default: through the Obsergent proxy, from config.yaml, "
                                                  "so the calls are recorded)")
     run.add_argument("--direct", action="store_true", help="call the gateway directly instead (not recorded)")
     run.add_argument("--token", default=None, help="bearer token, only if you enabled the mcp-auth policy")

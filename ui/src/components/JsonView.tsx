@@ -1,4 +1,4 @@
-// Pretty JSON with the parts AgentTrace hid (***) highlighted and explained.
+// Pretty JSON with the parts Obsergent hid (***) highlighted and explained.
 import { Fragment, type ReactNode } from "react";
 import { prettyJson } from "../lib/format";
 
@@ -22,14 +22,14 @@ export function highlight(text: string): ReactNode[] {
         <span key={index} className="json-str">
           {pieces.map((piece, i) => (
             <Fragment key={i}>
-              {i > 0 && <span className="redacted" title="Hidden by AgentTrace: this looked like a secret">***</span>}
+              {i > 0 && <span className="redacted" title="Hidden by Obsergent: this looked like a secret">***</span>}
               {piece}
             </Fragment>
           ))}
         </span>,
       );
     } else if (match[3]) {
-      parts.push(<span key={index} className="redacted" title="Hidden by AgentTrace: this looked like a secret">***</span>);
+      parts.push(<span key={index} className="redacted" title="Hidden by Obsergent: this looked like a secret">***</span>);
     } else {
       parts.push(<span key={index} className="json-num">{whole}</span>);
     }

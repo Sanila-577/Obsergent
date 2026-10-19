@@ -1,11 +1,11 @@
-"""A LangGraph + Ollama agent traced by AgentTrace (SDK + proxy).
+"""A LangGraph + Ollama agent traced by Obsergent (SDK + proxy).
 
-    agenttrace up                 # in another terminal: starts the server
+    obsergent up                 # in another terminal: starts the server
     python agent.py "Do you have a Python book in stock?"
-    agenttrace traces
+    obsergent traces
     # the model comes from .env (copy .env.example): Ollama, OpenAI, Anthropic, Groq, OpenRouter, Hugging Face, ...
 
-Two recorders feed the AgentTrace server:
+Two recorders feed the Obsergent server:
   * the SDK  (at.init)        records the inside of the agent: LangGraph steps, model calls
   * the proxy (proxy_server)  records every MCP message between the agent and the server
 Both join into ONE trace through the W3C trace context.
@@ -37,10 +37,10 @@ from llm import get_llm
 # OpenTelemetry API for making our own root span.
 from opentelemetry import trace
 
-# The AgentTrace SDK.
-from agenttrace.sdk import setup as at  # the SDK: init(), proxy_server(), trace_tool_calls()
+# The Obsergent SDK.
+from obsergent.sdk import setup as at  # the SDK: init(), proxy_server(), trace_tool_calls()
 
-# 1. Spans -> AgentTrace server (http://127.0.0.1:7318), and LangGraph is auto-traced.
+# 1. Spans -> Obsergent server (http://127.0.0.1:7318), and LangGraph is auto-traced.
 provider = at.init("bookshop-agent")
 # A tracer for the one span we create by hand.
 tracer = trace.get_tracer("bookshop-agent")
@@ -82,10 +82,10 @@ def build_graph(tools):
 async def run(question: str) -> str:
     # 2. One root span for the whole run: every span below becomes part of this trace.
     with tracer.start_as_current_span("agent.run"):
-        # 3. Start the MCP server THROUGH the AgentTrace proxy. Built inside the root span,
+        # 3. Start the MCP server THROUGH the Obsergent proxy. Built inside the root span,
         #    so the proxy is told which trace it belongs to (MCP_PROXY_TRACEPARENT).
         # With MCP_URL set (for example http://127.0.0.1:7319/mcp/wso2) the agent instead talks Streamable HTTP to that
-        # URL: the AgentTrace HTTP proxy in front of a gateway. Without it: the stdio server through the stdio proxy.
+        # URL: the Obsergent HTTP proxy in front of a gateway. Without it: the stdio server through the stdio proxy.
         if os.environ.get("MCP_URL"):
             servers = {"bookshop": {"transport": "streamable_http", "url": os.environ["MCP_URL"]}}
         else:

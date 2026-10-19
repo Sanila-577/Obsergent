@@ -3,10 +3,10 @@ import json
 
 import pytest
 
-from agenttrace.ingest.billed import add_billing_attributes, billing_attributes
-from agenttrace.ingest.pipeline import ingest_spans
-from agenttrace.models import Span
-from agenttrace.storage.sqlite import SQLiteStorage
+from obsergent.ingest.billed import add_billing_attributes, billing_attributes
+from obsergent.ingest.pipeline import ingest_spans
+from obsergent.models import Span
+from obsergent.storage.sqlite import SQLiteStorage
 
 
 def langchain_result(usage: dict, service_tier: str | None = None) -> str:
@@ -30,19 +30,19 @@ def test_openrouter_cost_is_read_from_the_recorded_usage():
     usage = {"prompt_tokens": 194, "completion_tokens": 2, "total_tokens": 196, "cost": 0.95, "is_byok": False,
              "cost_details": {"upstream_inference_cost": 19}}
     found = billing_attributes(model_span(langchain_result(usage)))
-    assert found["llm.cost.total"] == 0.95 and found["agenttrace.cost.source"] == "openrouter"
-    assert "agenttrace.cost.upstream_usd" not in found  # only for bring-your-own-key
+    assert found["llm.cost.total"] == 0.95 and found["obsergent.cost.source"] == "openrouter"
+    assert "obsergent.cost.upstream_usd" not in found  # only for bring-your-own-key
 
 
 def test_openrouter_byok_also_records_what_your_provider_charged():
     usage = {"prompt_tokens": 10, "cost": 0.0, "is_byok": True, "cost_details": {"upstream_inference_cost": 0.0012}}
     found = billing_attributes(model_span(langchain_result(usage)))
-    assert found["llm.cost.total"] == 0.0 and found["agenttrace.cost.upstream_usd"] == pytest.approx(0.0012)
+    assert found["llm.cost.total"] == 0.0 and found["obsergent.cost.upstream_usd"] == pytest.approx(0.0012)
 
 
 def test_xai_ticks_become_dollars():
     found = billing_attributes(model_span(langchain_result({"prompt_tokens": 199, "cost_in_usd_ticks": 37_756_000})))
-    assert found["llm.cost.total"] == pytest.approx(0.0037756) and found["agenttrace.cost.source"] == "xai"
+    assert found["llm.cost.total"] == pytest.approx(0.0037756) and found["obsergent.cost.source"] == "xai"
 
 
 def test_a_plain_usage_dictionary_has_no_provider_charge():
@@ -54,8 +54,8 @@ def test_other_billing_facts_are_normalised():
              "cache_creation": {"ephemeral_1h_input_tokens": 300, "ephemeral_5m_input_tokens": 7045},
              "server_tool_use": {"web_search_requests": 2}, "inference_geo": "us"}
     found = billing_attributes(model_span(langchain_result(usage, "batch")))
-    assert found["llm.service_tier"] == "batch" and found["agenttrace.web_search_requests"] == 2
-    assert found["agenttrace.cache_write_1h_tokens"] == 300 and found["agenttrace.inference_geo"] == "us"
+    assert found["llm.service_tier"] == "batch" and found["obsergent.web_search_requests"] == 2
+    assert found["obsergent.cache_write_1h_tokens"] == 300 and found["obsergent.inference_geo"] == "us"
     assert found["llm.token_count.prompt_details.cache_write"] == 7345
 
 
@@ -64,13 +64,13 @@ def test_deepseek_cache_hits_cohere_billed_units_and_gemini_thinking():
     assert deepseek["llm.token_count.prompt_details.cache_read"] == 80
     billed = {"billed_units": {"input_tokens": 9, "output_tokens": 4}, "cost": None}
     cohere = billing_attributes(model_span(langchain_result(billed)))
-    assert cohere["agenttrace.billed_units.input"] == 9 and cohere["agenttrace.billed_units.output"] == 4
+    assert cohere["obsergent.billed_units.input"] == 9 and cohere["obsergent.billed_units.output"] == 4
     # Gemini: the completion count the tracer recorded equals the candidates only, so the thinking tokens are extra output.
     gemini = billing_attributes(model_span(langchain_result({"candidates_token_count": 20, "thoughts_token_count": 150})))
-    assert gemini["agenttrace.extra_output_tokens"] == 150
+    assert gemini["obsergent.extra_output_tokens"] == 150
     included = billing_attributes(model_span(langchain_result({"candidates_token_count": 20, "thoughts_token_count": 150}),
                                              **{"llm.token_count.completion": 170}))
-    assert "agenttrace.extra_output_tokens" not in included
+    assert "obsergent.extra_output_tokens" not in included
 
 
 def test_the_raw_response_of_the_openai_sdk_instrumentor_is_understood_too():

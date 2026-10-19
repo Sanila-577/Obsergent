@@ -2,7 +2,7 @@
 
 OpenTelemetry lets you plug in your own *exporter*: the piece that receives
 finished spans. This exporter saves every span into a SQLite database file,
-which is exactly what AgentTrace's local mode does at a bigger scale.
+which is exactly what Obsergent's local mode does at a bigger scale.
 
 Vocabulary used below:
   trace  = the full story of one run (e.g. "making one cup of tea").

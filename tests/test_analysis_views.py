@@ -2,19 +2,19 @@
 import json
 from pathlib import Path
 
-from agenttrace.analysis.findings import (
+from obsergent.analysis.findings import (
     gateway_findings,
     order_findings,
     result_findings,
     smell_findings,
     tool_list_findings,
 )
-from agenttrace.analysis.gateway_view import summarize_gateway
-from agenttrace.analysis.policy import suggest_policy
-from agenttrace.analysis.stats import latency_summary, percentile
-from agenttrace.analysis.toolsdiff import diff_tool_lists, word_diff
-from agenttrace.ingest.gateway import normalize_gateway_spans
-from agenttrace.models import Span
+from obsergent.analysis.gateway_view import summarize_gateway
+from obsergent.analysis.policy import suggest_policy
+from obsergent.analysis.stats import latency_summary, percentile
+from obsergent.analysis.toolsdiff import diff_tool_lists, word_diff
+from obsergent.ingest.gateway import normalize_gateway_spans
+from obsergent.models import Span
 
 FIXTURE = Path(__file__).parent / "fixtures" / "apim_gateway.json"
 
@@ -25,7 +25,7 @@ def tool(name, description="d", schema=None):
 
 def call(span_id, tool_name="search", start=1, dur=1, **attributes):
     attrs = {"mcp.method.name": "tools/call", "gen_ai.tool.name": tool_name, "mcp.tool.arguments": "{}"} | attributes
-    return Span("t" * 32, span_id, None, f"tools/call {tool_name}", "CLIENT", "agenttrace-proxy", start,
+    return Span("t" * 32, span_id, None, f"tools/call {tool_name}", "CLIENT", "obsergent-proxy", start,
                 start + dur, attributes=attrs)
 
 
@@ -93,7 +93,7 @@ def test_smells_become_findings():
 
 
 def test_refused_gateway_calls_are_grouped_with_a_count():
-    refused = [call(f"s{i}", start=i, **{"gateway.decision": "forbidden", "agenttrace.caller.application": "app1"})
+    refused = [call(f"s{i}", start=i, **{"gateway.decision": "forbidden", "obsergent.caller.application": "app1"})
                for i in range(3)]
     fine = call("ok", **{"gateway.decision": "allowed"})
     (finding,) = gateway_findings(refused + [fine])
@@ -122,8 +122,8 @@ def fixture_spans() -> list[Span]:
 
 def test_gateway_summary_from_real_apim_spans():
     spans = fixture_spans()
-    gateway = [s for s in spans if s.attributes.get("agenttrace.layer") == "gateway"]
-    proxy = [s for s in spans if s.service == "agenttrace-proxy"]
+    gateway = [s for s in spans if s.attributes.get("obsergent.layer") == "gateway"]
+    proxy = [s for s in spans if s.service == "obsergent-proxy"]
     summary = summarize_gateway(gateway, proxy)
     assert summary["receiving"] and summary["calls_total"] == 3
     assert summary["decisions"] == {"allowed": 1, "forbidden": 1, "unauthorized": 1}

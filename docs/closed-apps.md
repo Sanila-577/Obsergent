@@ -1,14 +1,14 @@
 # Recording Claude Desktop, Cursor and other apps you can't modify
 
-Apps like Claude Desktop talk to MCP servers, but you can't add AgentTrace's SDK to them. Instead you change **one entry
-in the app's config** so that it starts `agenttrace proxy` instead of the server. The proxy starts the real server itself
+Apps like Claude Desktop talk to MCP servers, but you can't add Obsergent's SDK to them. Instead you change **one entry
+in the app's config** so that it starts `obsergent proxy` instead of the server. The proxy starts the real server itself
 and records every request (tool, arguments, result, timing), with **no code changes**.
 
 ```
-Claude Desktop  ──►  agenttrace proxy  ──►  your MCP server
+Claude Desktop  ──►  obsergent proxy  ──►  your MCP server
                           │ spans
                           ▼
-                 agenttrace up  (server + web UI)  →  SQLite
+                 obsergent up  (server + web UI)  →  SQLite
 ```
 
 What you will see: every MCP call Claude made, grouped into a **session** (one session = one proxy process = one
@@ -17,17 +17,17 @@ Claude's own conversation: that never leaves the app.
 
 ## Step by step (Claude Desktop on macOS)
 
-### 1. Start AgentTrace first
+### 1. Start Obsergent first
 
 ```bash
-cd /path/to/AgentTrace
+cd /path/to/Obsergent
 source .venv/bin/activate          # skip if an environment is already active (create it once: uv venv, then uv pip install -e ".[dev,langchain,examples,grpc]")
 make up                            # leave this terminal open: http://127.0.0.1:7318 (server.port in config.yaml)
 ```
 
-> **Order matters.** The proxy sends what it records to `agenttrace up`. If the server is not running while you use
+> **Order matters.** The proxy sends what it records to `obsergent up`. If the server is not running while you use
 > Claude, the calls still work, but **nothing is recorded** (Claude Desktop's log then shows
-> `Max retries exceeded ... 127.0.0.1:7318`). Start `agenttrace up`, then use Claude.
+> `Max retries exceeded ... 127.0.0.1:7318`). Start `obsergent up`, then use Claude.
 
 ### 2. Edit Claude Desktop's config
 
@@ -39,27 +39,27 @@ Use **absolute paths**: the app does not see your shell's `PATH` or virtual envi
 {
   "mcpServers": {
     "bookshop": {
-      "command": "/Users/you/AgentTrace/.venv/bin/agenttrace",
+      "command": "/Users/you/Obsergent/.venv/bin/obsergent",
       "args": [
         "proxy", "--name", "bookshop", "--",
-        "/Users/you/AgentTrace/.venv/bin/python",
-        "/Users/you/AgentTrace/examples/bookshop/bookshop_server.py"
+        "/Users/you/Obsergent/.venv/bin/python",
+        "/Users/you/Obsergent/examples/bookshop/bookshop_server.py"
       ]
     }
   }
 }
 ```
 
-The pattern is always: `command` = the `agenttrace` program, `args` = `proxy --name <a label> -- <the real server's command and arguments>`. If the file already has other settings, keep them: `"mcpServers"` is just one more key, and
+The pattern is always: `command` = the `obsergent` program, `args` = `proxy --name <a label> -- <the real server's command and arguments>`. If the file already has other settings, keep them: `"mcpServers"` is just one more key, and
 **mind the commas** (a missing comma makes the whole file invalid and the app ignores it).
 
-To find your paths: `echo "$(pwd)/.venv/bin/agenttrace"` from the repository root.
+To find your paths: `echo "$(pwd)/.venv/bin/obsergent"` from the repository root.
 
 A second, third... server is just another entry, e.g. the filesystem server (use the absolute path of `npx`: `which npx`):
 
 ```json
 "filesystem": {
-  "command": "/Users/you/AgentTrace/.venv/bin/agenttrace",
+  "command": "/Users/you/Obsergent/.venv/bin/obsergent",
   "args": ["proxy", "--name", "filesystem", "--",
            "/usr/local/bin/npx", "-y", "@modelcontextprotocol/server-filesystem", "/Users/you/Documents"]
 }
@@ -84,25 +84,25 @@ Open **http://127.0.0.1:7318**:
 * **Servers & tools** → `bookshop`: how often each tool was used, and the version history of its tool list.
 * **Findings** → anything suspicious (a tool whose description changed, risky tool names, injection-like text).
 
-The same in the terminal: `agenttrace sessions`, `agenttrace traces`, `agenttrace show <id>`.
+The same in the terminal: `obsergent sessions`, `obsergent traces`, `obsergent show <id>`.
 
 ## If it does not work
 
 | Symptom                                                                | What to check                                                                                                                                                                                                                                                                                                                                                                 |
 | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bookshop` is not listed, or shows an error in Settings → Developer | The config JSON must be valid (commas!). Run the exact `command` + `args` in a terminal: it should wait silently (it is waiting for a client). Fix any path error.                                                                                                                                                                                                        |
-| `bookshop` runs but nothing appears in AgentTrace                    | Was `agenttrace up` running **before** you used Claude (step 1)? Same database and port? The proxy reads the repository's `config.yaml` (`server.port`, `storage.path`); if you moved the repository or use another config, add `"env": {"AGENTTRACE_CONFIG": "/abs/path/config.yaml"}` (or `"AGENTTRACE_ENDPOINT": "http://127.0.0.1:PORT"`) to the entry. |
-| It stopped working after you restarted `agenttrace up`               | The proxy keeps running inside Claude Desktop, so recording resumes by itself; if the server was down during a call, that call was not recorded.                                                                                                                                                                                                                              |
-| `bookshop` shows as disconnected                                     | Something stopped the proxy process (for example `pkill -f agenttrace`). Quit and reopen Claude Desktop.                                                                                                                                                                                                                                                                    |
+| `bookshop` runs but nothing appears in Obsergent                    | Was `obsergent up` running **before** you used Claude (step 1)? Same database and port? The proxy reads the repository's `config.yaml` (`server.port`, `storage.path`); if you moved the repository or use another config, add `"env": {"OBSERGENT_CONFIG": "/abs/path/config.yaml"}` (or `"OBSERGENT_ENDPOINT": "http://127.0.0.1:PORT"`) to the entry. |
+| It stopped working after you restarted `obsergent up`               | The proxy keeps running inside Claude Desktop, so recording resumes by itself; if the server was down during a call, that call was not recorded.                                                                                                                                                                                                                              |
+| `bookshop` shows as disconnected                                     | Something stopped the proxy process (for example `pkill -f obsergent`). Quit and reopen Claude Desktop.                                                                                                                                                                                                                                                                    |
 | Claude says it cannot find the tool                                    | Quit and reopen Claude Desktop after every config change.                                                                                                                                                                                                                                                                                                                     |
 
 Claude Desktop's own log for the server is `~/Library/Logs/Claude/mcp-server-bookshop.log` (named after the config key);
-the proxy's messages (`agenttrace proxy: recording 'bookshop' ...`) and any export errors appear there.
+the proxy's messages (`obsergent proxy: recording 'bookshop' ...`) and any export errors appear there.
 
 ## Cursor and MCP Inspector
 
 * **Cursor**: the same JSON in `~/.cursor/mcp.json`.
-* **MCP Inspector** (`npx @modelcontextprotocol/inspector`): choose transport **STDIO**, command = the `agenttrace`
+* **MCP Inspector** (`npx @modelcontextprotocol/inspector`): choose transport **STDIO**, command = the `obsergent`
   absolute path, arguments = `proxy --name bookshop -- /abs/path/python /abs/path/bookshop_server.py`.
 
 ## Remote servers (Streamable HTTP) and gateways
@@ -110,10 +110,10 @@ the proxy's messages (`agenttrace proxy: recording 'bookshop' ...`) and any expo
 For a server reachable by URL, run the HTTP proxy and give the app the proxy's URL instead:
 
 ```bash
-agenttrace proxy-http --name github --url https://example.com/mcp
+obsergent proxy-http --name github --url https://example.com/mcp
 # the app now uses  http://127.0.0.1:7319/mcp/github      (the port is proxy.port in config.yaml; --port overrides it)
 ```
 
 The `Authorization` header is forwarded to the real server but never recorded. For a WSO2 API Platform gateway see
 [wso2-integration.md](wso2-integration.md). Whether a given app accepts a plain `http://127.0.0.1` MCP URL depends on the
-app; stdio servers through `agenttrace proxy` work everywhere.
+app; stdio servers through `obsergent proxy` work everywhere.

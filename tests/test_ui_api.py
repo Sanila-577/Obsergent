@@ -4,11 +4,11 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from agenttrace.ingest.pipeline import ingest_spans
-from agenttrace.server import app as app_module
-from agenttrace.server.app import create_app
-from agenttrace.storage.sqlite import SQLiteStorage
 from conftest import load_fixture_spans
+from obsergent.ingest.pipeline import ingest_spans
+from obsergent.server import app as app_module
+from obsergent.server.app import create_app
+from obsergent.storage.sqlite import SQLiteStorage
 
 
 def tool(name, description="d"):
@@ -81,8 +81,9 @@ def test_tools_table_and_topology(client):
     assert tools["search_books"]["calls"] >= 1 and tools["search_books"]["p95_ms"] > 0
     assert tools["get_price_and_stock"]["server"] == "bookshop"
     graph = client.get("/api/topology").json()
-    kinds = {n["kind"] for n in graph["nodes"]}
-    assert kinds == {"client", "server", "tool"}
+    assert {n["kind"] for n in graph["nodes"]} == {"client", "gateway", "server"}  # tools stay hidden until a server is expanded
+    expanded = client.get("/api/topology", params={"expand": "bookshop"}).json()
+    assert {n["kind"] for n in expanded["nodes"]} == {"client", "gateway", "server", "tool"}
     ids = {n["id"] for n in graph["nodes"]}
     assert all(e["source"] in ids and e["target"] in ids and e["calls"] >= 1 for e in graph["edges"])
 
@@ -161,13 +162,13 @@ def test_session_timeline(client):
 # -------------------------------------------------------------------------------- the UI
 def test_ui_is_served_with_a_client_side_routing_fallback(tmp_path, monkeypatch, storage):
     (tmp_path / "assets").mkdir()
-    (tmp_path / "index.html").write_text("<html>agenttrace ui</html>")
+    (tmp_path / "index.html").write_text("<html>obsergent ui</html>")
     (tmp_path / "assets" / "app.js").write_text("console.log('app')")
     (tmp_path.parent / "secret.txt").write_text("secret")
     monkeypatch.setattr(app_module, "STATIC_DIR", tmp_path)
     client = TestClient(create_app(storage))
-    assert "agenttrace ui" in client.get("/").text
-    assert "agenttrace ui" in client.get("/runs/abc123").text  # a deep link reloads into the app
+    assert "obsergent ui" in client.get("/").text
+    assert "obsergent ui" in client.get("/runs/abc123").text  # a deep link reloads into the app
     assert "console.log" in client.get("/assets/app.js").text
     assert client.get("/health").json() == {"status": "ok"}
     assert client.get("/api/nope").status_code == 404 and client.get("/v1/nope").status_code == 404

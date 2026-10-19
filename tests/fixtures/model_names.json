@@ -1,0 +1,11 @@
+[
+  {"name": "gpt-4o-mini", "provider": "openai", "display": "gpt-4o-mini"},
+  {"name": "gpt-4o-mini-2024-07-18", "provider": "openai", "display": "gpt-4o-mini"},
+  {"name": "claude-3-5-sonnet-20241022", "provider": "anthropic", "display": "claude-3-5-sonnet"},
+  {"name": "qwen2.5:7b", "provider": "ollama", "display": "qwen2.5:7b"},
+  {"name": "llama3.2:latest", "provider": "ollama", "display": "llama3.2"},
+  {"name": "openrouter/openai/gpt-4o-mini", "provider": "openrouter", "display": "gpt-4o-mini"},
+  {"name": "openai/gpt-4o-mini-2024-07-18", "provider": "openrouter", "display": "gpt-4o-mini"},
+  {"name": "GPT-4o-Mini", "provider": "OpenAI", "display": "gpt-4o-mini"},
+  {"name": "", "provider": "", "display": "unknown model"}
+]

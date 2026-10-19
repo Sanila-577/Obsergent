@@ -5,12 +5,12 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from agenttrace.ingest.pipeline import ingest_spans
-from agenttrace.models import Span
-from agenttrace.server import costing, price_sync
-from agenttrace.server.app import create_app
-from agenttrace.storage.sqlite import SQLiteStorage
 from conftest import load_fixture_spans
+from obsergent.ingest.pipeline import ingest_spans
+from obsergent.models import Span
+from obsergent.server import costing, price_sync
+from obsergent.server.app import create_app
+from obsergent.storage.sqlite import SQLiteStorage
 
 HOUR = 3_600 * 1_000_000_000
 
@@ -118,7 +118,7 @@ def test_prices_status_and_refresh_on_an_empty_database(tmp_path, monkeypatch):
 
 def test_pricing_can_be_switched_off(store, client, monkeypatch):
     add_run(store, "4" * 32)
-    monkeypatch.setenv("AGENTTRACE_PRICING", "false")
+    monkeypatch.setenv("OBSERGENT_PRICING", "false")
     assert client.get("/api/spending").json() == {"enabled": False}
     assert client.get("/api/traces").json()[0]["cost"] == {"enabled": False}
 
@@ -151,7 +151,7 @@ def test_the_providers_own_cost_is_used_and_counted_as_exact(store, client):
 
 
 def test_exact_cost_can_be_switched_off_to_see_the_estimate(store, client, monkeypatch):
-    monkeypatch.setenv("AGENTTRACE_PRICING_EXACT", "false")
+    monkeypatch.setenv("OBSERGENT_PRICING_EXACT", "false")
     add_run(store, "7" * 32, **{"output.value": openrouter_output(0.5)})
     assert client.get(f"/api/traces/{'7' * 32}").json()["cost"]["usd"] == pytest.approx(0.00021)
 

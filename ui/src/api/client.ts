@@ -1,7 +1,8 @@
-// Thin typed wrappers around the AgentTrace REST API. Every page talks to the server only through here.
+// Thin typed wrappers around the Obsergent REST API. Every page talks to the server only through here.
 // Only types (the shapes of API data); nothing is loaded at run time.
 import type {
-  Conversation, Finding, GatewayCall, GatewaySummary, Generations, ModelUsage, Overview, PolicySuggestion, RunDiff,
+  AgentEntry, AgentGraph, McpServer, ModelEntry, QueryCard, QueryThread, QueryTimeline,
+  Conversation, Finding, GatewayCall, GatewaySummary, Generations, Overview, PolicySuggestion, RunDiff,
   ServerInfo, Session, SnapshotsResponse, TimelineEvent, ToolListDiff, ToolStats, Topology, TraceDetail, TraceFilters,
   TraceSummary, Span, Spending, PriceStatus,
 } from "./types";
@@ -52,8 +53,14 @@ export const api = {
   generations: (id: string) => request<Generations>(`/api/traces/${id}/generations`),
   diff: (a: string, b: string) => request<RunDiff>("/api/diff", { a, b }),
   tools: (hours: number) => request<ToolStats[]>("/api/tools", { hours }),
-  models: () => request<ModelUsage[]>("/api/models"),
-  topology: (hours: number) => request<Topology>("/api/topology", { hours }),
+  models: () => request<ModelEntry[]>("/api/models"),
+  topology: (hours: number, expand = "") => request<Topology>("/api/topology", { hours, expand }),
+  queries: (params: { hours?: number; limit?: number; q?: string; before_ns?: number; since?: number; until?: number } = {}) => request<QueryCard[]>("/api/queries", params),
+  query: (id: string) => request<QueryThread>(`/api/queries/${id}`),
+  queriesTimeline: (hours: number) => request<QueryTimeline>("/api/queries/timeline", { hours }),
+  agents: () => request<AgentEntry[]>("/api/agents"),
+  agentGraph: (name: string) => request<AgentGraph>(`/api/agents/${encodeURIComponent(name)}/graph`),
+  mcps: () => request<McpServer[]>("/api/mcps"),
   sessions: () => request<Session[]>("/api/sessions"),
   timeline: (id: string) => request<{ session_id: string; events: TimelineEvent[] }>(`/api/sessions/${id}/timeline`),
   servers: () => request<ServerInfo[]>("/api/servers"),

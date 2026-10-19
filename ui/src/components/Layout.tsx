@@ -2,7 +2,7 @@
 // useQuery loads data from the API and keeps it fresh.
 import { useQuery } from "@tanstack/react-query";
 // Icons.
-import { Activity, GitCompare, Info, LayoutDashboard, MessagesSquare, Moon, Wallet, Network, Radio, Search, ShieldAlert, Sun, Waypoints, Wrench } from "lucide-react";
+import { Activity, Bot, Cpu, GitCompare, Info, LayoutDashboard, List, MessagesSquare, Moon, Network, Plug, Radio, Search, ShieldAlert, Sun, Wallet, Waypoints } from "lucide-react";
 // State and side-effect hooks.
 import { useEffect, useState } from "react";
 // Router pieces: links, the slot where the current page appears, and navigate().
@@ -13,6 +13,7 @@ import { api } from "../api/client";
 import { useSettings } from "../lib/state";
 // The Ctrl/Cmd+K search box.
 import { CommandPalette } from "./CommandPalette";
+import { Logo } from "./Logo";
 // The 1h/6h/24h/7d switch.
 import { PAGES } from "../lib/words";
 import { Segmented } from "./ui";
@@ -20,19 +21,22 @@ import { Segmented } from "./ui";
 // The left menu: URL, label and icon.
 const NAV = [
   { to: "/", label: PAGES.overview.title, icon: LayoutDashboard, end: true },
-  { to: "/runs", label: PAGES.runs.title, icon: Activity },
-  { to: "/sessions", label: PAGES.sessions.title, icon: MessagesSquare },
-  { to: "/servers", label: PAGES.servers.title, icon: Wrench },
+  { to: "/conversations", label: PAGES.conversations.title, icon: MessagesSquare },
+  { to: "/agents", label: PAGES.agents.title, icon: Bot },
+  { to: "/mcps", label: PAGES.mcps.title, icon: Plug },
+  { to: "/models", label: PAGES.models.title, icon: Cpu },
   { to: "/spending", label: PAGES.spending.title, icon: Wallet },
   { to: "/findings", label: PAGES.findings.title, icon: ShieldAlert, badge: true },
   { to: "/gateway", label: PAGES.gateway.title, icon: Network },
   { to: "/map", label: PAGES.map.title, icon: Waypoints },
+  { to: "/sessions", label: PAGES.sessions.title, icon: Activity },
+  { to: "/runs", label: PAGES.runs.title, icon: List, detailedOnly: true },
   { to: "/compare", label: PAGES.compare.title, icon: GitCompare },
   { to: "/about", label: PAGES.about.title, icon: Info },
 ];
 
 // "g" then a letter jumps to a page (like GitHub). Ignored while typing in a field.
-const GO_KEYS: Record<string, string> = { o: "/", r: "/runs", s: "/sessions", t: "/servers", f: "/findings", w: "/gateway", m: "/map" };
+const GO_KEYS: Record<string, string> = { o: "/", c: "/conversations", a: "/agents", m: "/mcps", d: "/models", s: "/spending", f: "/findings", w: "/gateway", n: "/map", r: "/runs" };
 
 // The frame around every page; <Outlet/> is where the page goes.
 export function Layout() {
@@ -75,16 +79,16 @@ export function Layout() {
   return (
     <div className="shell">
       <nav className="rail" aria-label="Main">
-        <div className="brand"><svg width="22" height="22" viewBox="0 0 32 32"><path d="M4 20h6l4-11 5 17 4-11h5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>AgentTrace</div>
-        {NAV.map(({ to, label, icon: Icon, end, badge }) => (
-          <NavLink key={to} to={to} end={end} className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
+        <div className="brand"><Logo size={26} />Obsergent</div>
+        {NAV.filter((item) => !item.detailedOnly || detailed).map(({ to, label, icon: Icon, end, badge }) => (
+          <NavLink key={to} to={to} end={end} data-nav={label} className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}>
             <Icon size={17} />{label}
             {badge && open > 0 && <span className="nav-badge" aria-label={`${open} things to check`}>{open}</span>}
           </NavLink>
         ))}
         <div className="rail-foot">
           <div className="row"><span className={`dot`} style={{ background: health.isError ? "var(--bad)" : "var(--ok)" }} />{health.isError ? "server unreachable" : "server connected"}</div>
-          <div style={{ marginTop: 6 }}><kbd>⌘K</kbd> search · <kbd>g</kbd> <kbd>r</kbd> go to</div>
+          <div style={{ marginTop: 6 }}><kbd>⌘K</kbd> search · <kbd>g</kbd> <kbd>c</kbd> go to</div>
         </div>
       </nav>
       <div className="main">

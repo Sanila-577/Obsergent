@@ -5,7 +5,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from agenttrace.proxy.recorder import SESSION_ENV, Recorder
+from obsergent.proxy.recorder import SESSION_ENV, Recorder
 
 TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736"
 SPAN_ID = "00f067aa0ba902b7"

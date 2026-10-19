@@ -32,9 +32,9 @@ jobs:
       # the browser tests build the UI, load a throw-away test database and start the real server themselves (see playwright.config.ts)
       - run: npx playwright test
         working-directory: ui
-        env: { AGENTTRACE_PYTHON: python }
+        env: { OBSERGENT_PYTHON: python }
       - name: the built UI must be inside the wheel
         run: |
           pip install build
           python -m build --wheel
-          unzip -l dist/*.whl | grep "agenttrace/server/static/index.html"
+          unzip -l dist/*.whl | grep "obsergent/server/static/index.html"

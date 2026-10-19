@@ -10,8 +10,11 @@ import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
 // Shares live/hours/theme settings with all pages.
 import { SettingsProvider } from "./lib/state";
-// The stylesheet.
-import "./styles.css";
+// The stylesheets: colours, components, the pages' own parts, then the glass look on top.
+import "./styles/tokens.css";
+import "./styles/components.css";
+import "./styles/pages.css";
+import "./styles/glass.css";
 
 // Data is cheap to refetch from a local server: keep it fresh, but don't retry failed calls for long.
 // The shared data cache.
