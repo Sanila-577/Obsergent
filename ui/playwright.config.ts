@@ -16,7 +16,7 @@ export default defineConfig({
   use: { baseURL: `http://127.0.0.1:${port}`, viewport: { width: 1440, height: 900 }, trace: "retain-on-failure" },
   webServer: {
     command: `npm run build && rm -rf .e2e && mkdir -p .e2e && OBSERGENT_DB=${db} ${python} e2e/seed_test_db.py && `
-      + `OBSERGENT_DB=${db} OBSERGENT_PORT=${port} ${python} -m obsergent.cli up`,
+      + `OBSERGENT_DB=${db} OBSERGENT_PORT=${port} OBSERGENT_TOKEN_BUDGET=2000 ${python} -m obsergent.cli up`,
     url: `http://127.0.0.1:${port}/health`,
     reuseExistingServer: false,
     timeout: 120_000,

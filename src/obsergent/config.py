@@ -44,6 +44,7 @@ DEFAULTS = {
         "local_providers": ["ollama", "lmstudio", "llamacpp", "vllm"],
         "overrides": {},
     },
+    "usage": {"daily_token_budget": 0, "warn_at_percent": 80, "question_token_alert": 0},
 }
 
 # Setting (dotted key) -> the environment variable that overrides it.
@@ -63,6 +64,7 @@ ENVIRONMENT = {
     "pricing.auto_refresh": "OBSERGENT_PRICING_AUTO_REFRESH",
     "pricing.exact_from_provider": "OBSERGENT_PRICING_EXACT",
     "pricing.reprice": "OBSERGENT_PRICING_REPRICE",
+    "usage.daily_token_budget": "OBSERGENT_TOKEN_BUDGET",
 }
 
 
@@ -254,3 +256,18 @@ def pricing_local_providers() -> list[str]:
 def pricing_overrides() -> dict:
     """Optional prices typed by hand: model -> {input_per_million, output_per_million, ...}. Normally empty."""
     return dict(get("pricing.overrides") or {})
+
+
+def usage_daily_token_budget() -> int:
+    """Tokens you allow per day (0 = no budget): from this share on, the Overview and Things to check warn."""
+    return int(get("usage.daily_token_budget") or 0)
+
+
+def usage_warn_at_percent() -> float:
+    """At which share of the daily budget the warning starts (80 = 80 %)."""
+    return float(get("usage.warn_at_percent") or 80)
+
+
+def usage_question_token_alert() -> int:
+    """A single question using more tokens than this is flagged (0 = only flag questions far above the usual)."""
+    return int(get("usage.question_token_alert") or 0)

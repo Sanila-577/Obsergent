@@ -7,12 +7,14 @@ import { ApiError } from "../api/client";
 import { LAYER_LABEL, type Layer } from "../lib/trace";
 import { splitList } from "../lib/format";
 import { DECISION_WORDS } from "../lib/words";
+import { Help } from "./Help";
+import { useToast } from "../lib/toast";
 
-export function PageHead({ title, sub, about, children }: { title: string; sub?: ReactNode; about?: string; children?: ReactNode }) {
+export function PageHead({ title, sub, about, help, children }: { title: string; sub?: ReactNode; about?: string; help?: string; children?: ReactNode }) {
   return (
     <>
       <div className="page-head">
-        <h1>{title}</h1>
+        <h1>{title}{help && <Help text={help} />}</h1>
         {sub && <span className="sub">{sub}</span>}
         <div className="grow" />
         {children}
@@ -36,12 +38,15 @@ export function Card({ title, actions, flush, children }: { title?: ReactNode; a
   );
 }
 
-export function Tile({ label, value, hint, tone, to }: { label: string; value: ReactNode; hint?: ReactNode; tone?: "bad" | "warn"; to?: string }) {
+export function Tile({ label, value, hint, tone, to, icon, trend, extra }: {
+  label: string; value: ReactNode; hint?: ReactNode; tone?: "bad" | "warn"; to?: string; icon?: ReactNode; trend?: ReactNode; extra?: ReactNode;
+}) {
   const body = (
     <>
-      <div className="label">{label}</div>
-      <div className="value">{value}</div>
+      <div className="label">{icon && <span className="tile-icon">{icon}</span>}{label}</div>
+      <div className="value-row"><div className="value">{value}</div>{trend && <span className="trend">{trend}</span>}</div>
       {hint && <div className="hint">{hint}</div>}
+      {extra}
     </>
   );
   return to ? (
@@ -137,9 +142,11 @@ export function Segmented<T extends string | number>({ options, value, onChange 
 
 export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
+  const toast = useToast();
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text);
+      toast("Copied");
       setCopied(true);
       setTimeout(() => setCopied(false), 1400);
     } catch {

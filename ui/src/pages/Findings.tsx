@@ -34,7 +34,7 @@ export function Findings() {
 
   return (
     <>
-      <PageHead title={PAGES.findings.title} about={PAGES.findings.about}>
+      <PageHead title={PAGES.findings.title} about={PAGES.findings.about} help={PAGES.findings.help}>
         <Segmented value={severity} onChange={setSeverity} options={[{ id: "all", label: "All" }, { id: "high", label: "Important" }, { id: "medium", label: "Worth a look" }, { id: "low", label: "Minor" }]} />
         <label className="check"><input type="checkbox" checked={showAcknowledged} onChange={(e) => setShowAcknowledged(e.target.checked)} /> Show dismissed</label>
       </PageHead>

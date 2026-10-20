@@ -6,7 +6,7 @@ import type { AgentEntry, AgentGraph, GraphNode } from "../api/types";
 import { FirstRun } from "../components/FirstRun";
 import { FlowGraph, type FlowEdgeInfo, type FlowNodeInfo } from "../components/FlowGraph";
 import { Card, EmptyState, PageHead, QueryState } from "../components/ui";
-import { formatMoney, formatMs, timeAgo } from "../lib/format";
+import { formatMoney, formatMs, formatTokens, timeAgo } from "../lib/format";
 import { useSettings } from "../lib/state";
 import { PAGES } from "../lib/words";
 
@@ -16,9 +16,9 @@ function AgentCard({ agent, selected, onPick }: { agent: AgentEntry; selected: b
   return (
     <button className={`gcard${selected ? " on" : ""}`} onClick={onPick} aria-pressed={selected} data-agent={agent.name}>
       <span className="gcard-top"><strong>{agent.name}</strong><span className="badge agent">{agent.framework}</span></span>
-      <span className="gcard-stats"><span><b>{agent.questions}</b> question{agent.questions === 1 ? "" : "s"}</span><span><b>{agent.tools.length}</b> tool{agent.tools.length === 1 ? "" : "s"}</span><span><b>{formatMoney(agent.usd)}</b></span></span>
+      <span className="gcard-stats"><span><b>{agent.questions}</b> question{agent.questions === 1 ? "" : "s"}</span><span><b>{formatTokens(agent.tokens.total)}</b> tokens</span><span><b>{formatMoney(agent.usd)}</b></span></span>
       <span className="row wrap" style={{ gap: 4 }}>{agent.models.map((m) => <span key={m} className="badge model">{m}</span>)}{agent.problems > 0 && <span className="badge error">{agent.problems} problem{agent.problems === 1 ? "" : "s"}</span>}</span>
-      <span className="muted gcard-line">Latest: {agent.latest_question || "-"} · {timeAgo(agent.last_ns)}</span>
+      <span className="muted gcard-line">{Math.round(agent.avg_steps)} steps and {formatTokens(agent.avg_tokens)} tokens per question · {timeAgo(agent.last_ns)}</span>
     </button>
   );
 }
@@ -27,7 +27,8 @@ function AgentCard({ agent, selected, onPick }: { agent: AgentEntry; selected: b
 export function graphParts(graph: AgentGraph): { nodes: FlowNodeInfo[]; edges: FlowEdgeInfo[] } {
   const nodes = graph.nodes.map<FlowNodeInfo>((node) => ({
     id: node.id, kind: node.kind, label: node.label, tone: node.errors ? "bad" : undefined,
-    sub: node.calls ? `${node.calls} time${node.calls === 1 ? "" : "s"}${node.avg_ms ? ` · ${formatMs(node.avg_ms)}` : ""}` : undefined,
+    sub: node.kind === "model" ? `${formatTokens(node.tokens)} tokens · ${node.calls}×`
+      : node.calls ? `${node.calls}×${node.avg_ms ? ` · ${formatMs(node.avg_ms)}` : ""}` : undefined,
   }));
   const edges = graph.edges.map<FlowEdgeInfo>((edge) => ({
     source: edge.source, target: edge.target, calls: edge.calls, errors: edge.errors,
@@ -49,7 +50,7 @@ function NodePanel({ node, graph, onClose }: { node: GraphNode; graph: AgentGrap
         <dt>Used</dt><dd>{node.calls} time{node.calls === 1 ? "" : "s"}</dd>
         <dt>Typical time</dt><dd>{formatMs(node.avg_ms)}</dd>
         <dt>Total time</dt><dd>{formatMs(node.total_ms)}</dd>
-        {node.kind === "model" && <><dt>Cost</dt><dd>{formatMoney(node.cost_usd)}</dd></>}
+        {node.kind === "model" && <><dt>Tokens</dt><dd>{formatTokens(node.tokens)}</dd><dt>Cost</dt><dd>{formatMoney(node.cost_usd)}</dd></>}
         <dt>Problems</dt><dd>{node.errors || "none"}</dd>
       </dl>
       {incoming.length > 0 && <><h3>Comes from</h3><div className="row wrap" style={{ gap: 4 }}>{incoming.map((e) => <span key={e.source} className="badge outline">{label(e.source)} · {e.calls}×</span>)}</div></>}
@@ -93,7 +94,7 @@ export function Agents() {
   const agents = useQuery({ queryKey: ["agents"], queryFn: api.agents });
   return (
     <>
-      <PageHead title={PAGES.agents.title} about={PAGES.agents.about} />
+      <PageHead title={PAGES.agents.title} about={PAGES.agents.about} help={PAGES.agents.help} />
       <QueryState query={agents} empty={{ when: (a) => a.length === 0, title: "No agent has answered a question yet", hint: <FirstRun kind="overview" title="No agent has answered a question yet" /> }}>
         {(list) => {
           const current = list.find((a) => a.name === params.get("agent")) ?? list[0];

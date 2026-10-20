@@ -1,4 +1,4 @@
-import { formatCount, formatMoney, formatMs, formatPercent, formatTokens, moneyInWords, prettyJson, shortId, splitList, timeAgo } from "./format";
+import { formatChange, formatCount, formatMoney, formatMs, formatPercent, formatTokens, tokensInOut, moneyInWords, prettyJson, shortId, splitList, timeAgo } from "./format";
 
 describe("formatMs", () => {
   it.each([[0.4, "0.40 ms"], [12.34, "12.3 ms"], [340, "340 ms"], [1520, "1.52 s"], [125_000, "2 m 5 s"]])("%s -> %s", (input, expected) => {
@@ -55,8 +55,15 @@ describe("money", () => {
     expect(moneyInWords(null)).toBe("an unknown amount");
   });
   it("shortens token counts", () => {
-    expect(formatTokens(1037)).toBe("1,037");
-    expect(formatTokens(25_000)).toBe("25.0k");
+    expect(formatTokens(850)).toBe("850");
+    expect(formatTokens(1037)).toBe("1k");
+    expect(formatTokens(1234)).toBe("1.2k");
+    expect(formatTokens(157_600)).toBe("158k");
+    expect(formatTokens(2_400_000)).toBe("2.4M");
     expect(formatTokens(null)).toBe("-");
+    expect(tokensInOut({ input: 3100, output: 300 })).toBe("3.4k tokens (3.1k in · 300 out)");
+    expect(formatChange(0.12)).toBe("↑ 12%");
+    expect(formatChange(-0.3)).toBe("↓ 30%");
+    expect(formatChange(null)).toBe("");
   });
 });

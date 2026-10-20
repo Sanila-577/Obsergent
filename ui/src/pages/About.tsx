@@ -32,7 +32,7 @@ export function About() {
   }, [current.menu]);
   return (
     <>
-      <PageHead title={PAGES.about.title} about={PAGES.about.about} />
+      <PageHead title={PAGES.about.title} about={PAGES.about.about} help={PAGES.about.help} />
       <div className="col" style={{ maxWidth: 980, gap: 18 }}>
         <Card>
           <div className="about-hero">

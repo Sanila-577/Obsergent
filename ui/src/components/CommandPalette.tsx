@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
-import { shortId, formatMs } from "../lib/format";
+import { formatTokens } from "../lib/format";
 
 interface Item {
   group: string;
@@ -18,7 +18,8 @@ export const PAGES: Item[] = [
   { group: "Pages", label: "Agents", to: "/agents", hint: "g a" },
   { group: "Pages", label: "MCPs: tool servers and their tools", to: "/mcps", hint: "g m" },
   { group: "Pages", label: "Models: the AI models used", to: "/models", hint: "g d" },
-  { group: "Pages", label: "Spending: what the models cost", to: "/spending", hint: "g s" },
+  { group: "Pages", label: "Usage & cost: tokens and dollars", to: "/spending", hint: "g s" },
+  { group: "Pages", label: "Heaviest questions (most tokens)", to: "/conversations?sort=tokens" },
   { group: "Pages", label: "Things to check", to: "/findings", hint: "g f" },
   { group: "Pages", label: "Gateway guard", to: "/gateway", hint: "g w" },
   { group: "Pages", label: "Connections", to: "/map", hint: "g n" },
@@ -35,7 +36,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const input = useRef<HTMLInputElement>(null);
   const questions = useQuery({ queryKey: ["palette-questions"], queryFn: () => api.queries({ limit: 15 }) });
   const agents = useQuery({ queryKey: ["agents"], queryFn: api.agents });
-  const models = useQuery({ queryKey: ["models"], queryFn: api.models });
+  const models = useQuery({ queryKey: ["models"], queryFn: () => api.models() });
   const mcps = useQuery({ queryKey: ["mcps"], queryFn: api.mcps });
 
   useEffect(() => input.current?.focus(), []);
@@ -43,9 +44,9 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const items = useMemo<Item[]>(() => {
     const all: Item[] = [
       ...PAGES,
-      ...(questions.data ?? []).map((q) => ({ group: "Questions", label: q.question || q.root_name, hint: `${shortId(q.trace_id)} · ${formatMs(q.duration_ms)}`, to: `/conversations?q=${q.trace_id}` })),
+      ...(questions.data ?? []).map((q) => ({ group: "Questions", label: q.question || q.root_name, hint: `${q.steps} steps · ${formatTokens(q.tokens.total)} tokens`, to: `/conversations?q=${q.trace_id}` })),
       ...(agents.data ?? []).map((a) => ({ group: "Agents", label: a.name, hint: `${a.questions} question(s)`, to: `/agents?agent=${encodeURIComponent(a.name)}` })),
-      ...(models.data ?? []).map((m) => ({ group: "Models", label: m.model, hint: m.provider ?? "", to: `/models?model=${encodeURIComponent(m.model)}` })),
+      ...(models.data ?? []).map((m) => ({ group: "Models", label: m.model, hint: `${formatTokens(m.tokens.total)} tokens · ${m.provider ?? ""}`, to: `/models?model=${encodeURIComponent(m.model)}` })),
       ...(mcps.data ?? []).map((s) => ({ group: "MCP servers", label: s.name, hint: `${s.tool_count} tool(s)`, to: `/mcps?server=${encodeURIComponent(s.name)}` })),
       ...(mcps.data ?? []).flatMap((s) => s.tools.map((t) => ({ group: "Tools", label: t.name, hint: s.name, to: `/mcps?server=${encodeURIComponent(s.name)}&tool=${encodeURIComponent(t.name)}` }))),
     ];

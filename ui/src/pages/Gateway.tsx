@@ -73,7 +73,7 @@ export function Gateway() {
 
   return (
     <>
-      <PageHead title={PAGES.gateway.title} about={PAGES.gateway.about} />
+      <PageHead title={PAGES.gateway.title} about={PAGES.gateway.about} help={PAGES.gateway.help} />
       <QueryState query={summary}>{(g) => (
         <div className="col" style={{ gap: 16 }}>
           <Card>

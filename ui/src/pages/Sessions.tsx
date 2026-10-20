@@ -18,7 +18,7 @@ export function Sessions() {
   const sessions = useQuery({ queryKey: ["sessions"], queryFn: api.sessions, refetchInterval });
   return (
     <>
-      <PageHead title={PAGES.sessions.title} about={PAGES.sessions.about} />
+      <PageHead title={PAGES.sessions.title} about={PAGES.sessions.about} help={PAGES.sessions.help} />
       <Card flush>
         <QueryState query={sessions} empty={{ when: (s) => s.length === 0, title: "No app activity yet",
           hint: <FirstRun kind="sessions" title="No app activity yet" /> }}>

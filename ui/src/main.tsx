@@ -10,6 +10,7 @@ import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
 // Shares live/hours/theme settings with all pages.
 import { SettingsProvider } from "./lib/state";
+import { ToastProvider } from "./lib/toast";
 // The stylesheets: colours, components, the pages' own parts, then the glass look on top.
 import "./styles/tokens.css";
 import "./styles/components.css";
@@ -25,9 +26,11 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
+        <ToastProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </ToastProvider>
       </SettingsProvider>
     </QueryClientProvider>
   </StrictMode>,

@@ -59,7 +59,7 @@ export function MapPage() {
 
   return (
     <>
-      <PageHead title={PAGES.map.title} about={PAGES.map.about}>
+      <PageHead title={PAGES.map.title} about={PAGES.map.about} help={PAGES.map.help}>
         {topology.data && topology.data.nodes.some((n) => n.kind === "server" && (n.tool_count ?? 0) > 0) && (
           <button onClick={() => setExpand(expand.length ? [] : ["*"])}>{expand.length ? "Hide all tools" : "Show all tools"}</button>
         )}

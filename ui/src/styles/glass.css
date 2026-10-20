@@ -40,9 +40,12 @@ button:hover:not(:disabled), .btn:hover { border-color: var(--accent); }
 @media (max-width: 900px) {
   .shell { grid-template-columns: 1fr; }
   .rail { flex-direction: row; overflow-x: auto; padding: 8px; border-right: none; border-bottom: 1px solid var(--glass-border); }
-  .rail .brand, .rail .rail-foot { display: none; }
+  .rail .brand, .rail .rail-foot, .rail .nav-heading { display: none; }
+  .nav-group { flex-direction: row; margin: 0; }
   .nav-link { white-space: nowrap; }
   .content { padding: 14px; }
+  .topbar { flex-wrap: wrap; padding: 8px 12px; gap: 8px; }
+  .topbar .grow { display: none; }
 }
 
 /* no blur available: solid panels with the same borders */
@@ -60,5 +63,5 @@ button:hover:not(:disabled), .btn:hover { border-color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   .tile, .q-card, .gcard, .nav-link { transition: none; }
   a.tile:hover, .q-card:hover, .gcard:hover { transform: none; }
-  .flow-edge-animated, .live-dot.on, .skeleton { animation: none !important; }
+  .flow-edge-animated .react-flow__edge-path, .live-dot.on, .skeleton { animation: none !important; }
 }

@@ -1,8 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
 
+// The welcome tour would cover the page: every test starts as a returning visitor (one test below checks the tour itself).
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => { if (!sessionStorage.getItem("tour-test")) localStorage.setItem("obsergent.tour", "done"); });
+});
+
 test("the spending page says what the models cost and lets you dig in", async ({ page }) => {
-  await page.goto("/spending");
-  await expect(page.getByRole("heading", { name: "Spending" })).toBeVisible();
+  await page.goto("/spending?view=dollars");
+  await expect(page.getByRole("heading", { name: "Usage & cost" })).toBeVisible();
   await expect(page.getByText(/You spent/)).toBeVisible();
   await expect(page.getByRole("img", { name: /Spending over time/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Where did the money go?" })).toBeVisible();
@@ -17,7 +22,7 @@ test("the spending page says what the models cost and lets you dig in", async ({
 });
 
 test("a cost the provider reported is marked exact and its share is stated", async ({ page }) => {
-  await page.goto("/spending");
+  await page.goto("/spending?view=dollars");
   await expect(page.getByText(/of this amount was reported by the provider/)).toBeVisible();
   await page.goto("/runs?model=openai/gpt-4o-mini");
   await expect(page.locator("tbody tr").first()).toContainText("$0.037"); // 3 model calls x $0.0123, reported by the provider
@@ -53,23 +58,27 @@ async function detailed(page: Page) {
 
 // Every test starts from the same seeded data: ~48 runs (agent runs and gateway calls), a loop, a drifting server.
 
-test("the overview shows the numbers, the questions chart and the slowest tools", async ({ page }) => {
+test("the overview shows four numbers, what needs attention and the questions chart", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
   await expect(page.locator(".tile").filter({ hasText: "Discussions" })).toContainText("35");
-  await expect(page.locator(".tile").filter({ hasText: "across 4 MCP servers" })).toBeVisible();
+  await expect(page.locator(".tile").filter({ hasText: "Steps" }).locator(".side-count")).toHaveCount(2);
+  await expect(page.locator(".tile").filter({ hasText: "Tokens" })).toContainText(/\d+(\.\d)?k/);
+  await expect(page.locator(".tile").filter({ hasText: "Cost" })).toContainText("$");
+  await expect(page.locator(".tile")).toHaveCount(4);
+  await expect(page.getByRole("list", { name: "Needs attention" }).getByText(/blocked by the gateway/)).toBeVisible();
   await expect(page.getByRole("img", { name: /Questions over time/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Slowest tools (p95)" })).toBeVisible();
-  await expect(page.getByText("Blocked by the gateway")).toBeVisible();
+  await page.locator(".tile").filter({ hasText: "Tokens" }).click();
+  await expect(page).toHaveURL(/\/spending\?view=tokens/);
 });
 
-test("find the slowest tool and see its details in a few clicks", async ({ page }) => {
-  await page.goto("/");
-  const slowest = page.locator("section", { hasText: "Slowest tools (p95)" }).locator("tbody tr").first();
-  const tool = (await slowest.locator("a").innerText()).trim();
-  await slowest.locator("a").click();
-  await expect(page).toHaveURL(new RegExp(`tool=${tool}`));
-  await expect(page.getByRole("list", { name: /^Tools of / })).toBeVisible();
+test("find the slowest tool in a few clicks", async ({ page }) => {
+  await page.goto("/mcps?server=bookshop");
+  await page.getByRole("button", { name: "Slowest", exact: true }).click();
+  await expect(page).toHaveURL(/sort=slow/);
+  const tools = page.getByRole("list", { name: "Tools of bookshop" }).locator(".gcard");
+  await tools.first().click();
+  await expect(page.getByText("How it is used")).toBeVisible();
 });
 
 test("runs can be filtered, and the filter lives in the URL", async ({ page }) => {
@@ -203,11 +212,11 @@ test("settings stay after a reload: theme, live tail and time window", async ({ 
   await page.getByRole("button", { name: "Switch theme" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.getByRole("button", { name: "Live" }).click();
-  await page.getByRole("button", { name: "7d" }).click();
+  await page.getByRole("button", { name: "7 days" }).click();
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await expect(page.getByRole("button", { name: "Live" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "7d" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "7 days" })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("a deep link survives a reload, and an unknown page says so", async ({ page }) => {
@@ -255,7 +264,7 @@ test("the help bubbles explain words in plain language", async ({ page }) => {
   await page.goto("/runs");
   await expect(page.locator("tbody tr").first()).toBeVisible();
   await page.locator("th .help").first().hover();
-  await expect(page.locator(".help-bubble").first()).toBeVisible();
+  await expect(page.locator("th .help .help-bubble").first()).toBeVisible();
 });
 
 // ------------------------------------------------------------------------- the question-first pages
@@ -287,41 +296,54 @@ test("the conversations page shows the questions as scrollable cards and opens e
   await expect(page.locator(".bubble.question")).toHaveCount(1);
 });
 
-test("a thread shows each tool's input and result, and the steps tab shows the timeline", async ({ page }) => {
+test("a thread shows each tool's input and result, and the timeline tab shows the events", async ({ page }) => {
   await page.goto("/conversations");
   await page.locator(".q-card").filter({ hasText: "Do you have a Python book" }).first().click();
   await expect(page.getByText(/Step 1 of \d+/)).toBeVisible();
   await page.locator(".thread-tool-head").first().click();
-  await expect(page.getByText("What it was asked").first()).toBeVisible();
-  await expect(page.getByText("What it returned").first()).toBeVisible();
-  await page.getByRole("button", { name: "Open all tools" }).click();
-  await expect(page.getByRole("button", { name: "Collapse tools" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Copy answer" })).toBeVisible();
-  await page.getByRole("tab", { name: "Steps" }).click();
+  await expect(page.getByRole("heading", { name: "Input" }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Result" }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Open tools" }).click();
+  await expect(page.getByRole("button", { name: "Close tools" })).toBeVisible();
+  await expect(page.locator(".bubble.answer").getByRole("button", { name: "Copy" })).toBeVisible();
+  await page.getByRole("tab", { name: "Timeline" }).click();
   await expect(page.getByRole("tree", { name: "Spans of this run" })).toBeVisible();
 });
 
-test("a peak on the overview chart shows the question on hover and opens it on click", async ({ page }) => {
+test("a point on the overview line chart shows the question, its steps and tokens, and opens it", async ({ page }) => {
   await page.goto("/");
-  const bars = page.locator(".peaks .recharts-bar-rectangle");
-  await expect(bars.first()).toBeVisible();
-  await bars.nth(3).hover();
+  const dots = page.locator(".steps-chart .chart-dot");
+  await expect(dots.first()).toBeVisible();
+  await expect(page.locator(".steps-chart .recharts-line")).toHaveCount(1);
+  await dots.nth(3).hover({ force: true });
   const tip = page.locator(".peaks-tip");
   await expect(tip).toBeVisible();
   await expect(tip).toContainText(/Python|Eric Matthes|cheaper|cheapest/);
-  await expect(tip).toContainText(/\d+ exchanges \(\d+ model calls?, \d+ tool uses?\)/);
-  await expect(tip).not.toContainText("worked");
+  await expect(tip).toContainText(/\d+ steps/);
+  await expect(tip).toContainText(/Tokens.*\d+.*in · \d+.*out/);
   const asked = (await tip.locator("strong").first().innerText()).trim();
-  await bars.nth(3).click();
+  await dots.nth(3).click({ force: true });
   await expect(page).toHaveURL(/\/conversations\?q=[0-9a-f]+/);
   await expect(page.locator(".bubble.question")).toContainText(asked);
 });
 
-test("latest queries asked are interactive and open their thread", async ({ page }) => {
+test("the chart can show tokens instead of steps, and the keyboard opens a point", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Latest queries asked" })).toBeVisible();
+  await page.getByRole("group", { name: "What the line shows" }).getByRole("button", { name: "Tokens" }).click();
+  const chart = page.locator(".steps-chart");
+  await chart.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".chart-focus .peaks-tip")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/conversations\?q=/);
+});
+
+test("latest questions are interactive and open their thread", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Latest questions" })).toBeVisible();
   const first = page.locator(".latest-q").first();
   await expect(first.locator(".latest-q-answer")).toBeVisible();
+  await expect(first).toContainText(/tokens/);
   await first.hover();
   await first.click();
   await expect(page).toHaveURL(/\/conversations\?q=/);
@@ -329,9 +351,9 @@ test("latest queries asked are interactive and open their thread", async ({ page
 
 test("one entry per model: the dated and the undated name are shown once, everywhere", async ({ page }) => {
   await page.goto("/");
-  const rows = page.locator("section", { hasText: "Models your agents used" }).locator("tbody tr");
+  const rows = page.locator("section", { hasText: "Models used" }).locator("tbody tr");
   await expect(rows.filter({ hasText: "gpt-4o-mini" })).toHaveCount(1);
-  await expect(page.locator("section", { hasText: "Models your agents used" })).not.toContainText("2024-07-18");
+  await expect(page.locator("section", { hasText: "Models used" })).not.toContainText("2024-07-18");
   await page.goto("/models");
   await expect(page.locator(".gcard", { hasText: "gpt-4o-mini" })).toHaveCount(1);
   await expect(page.locator(".gcard", { hasText: "2024-07-18" })).toHaveCount(0);
@@ -342,13 +364,21 @@ test("the models page lists providers, usage, price and what each model can do",
   await expect(page.getByRole("heading", { name: "Models" })).toBeVisible();
   const mini = page.locator(".gcard", { hasText: "gpt-4o-mini" });
   await expect(mini).toContainText("openai");
-  await expect(mini).toContainText("per million words");
+  await expect(mini).toContainText("per 1M tokens");
+  await expect(mini).toContainText(/tokens/);
+  await expect(mini.locator(".sparkline")).toBeVisible();
   await expect(page.locator(".gcard", { hasText: "qwen2.5:7b" })).toContainText("free");
   await mini.click();
-  await expect(page.getByText("How it was used")).toBeVisible();
-  await expect(page.getByText("What it cost").first()).toBeVisible();
-  await expect(page.getByText("What it can do")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How it was used", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^What it cost/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What it can do", exact: true })).toBeVisible();
   await expect(page).toHaveURL(/model=gpt-4o-mini/);
+  await expect(page.getByText(/you used .* in \+ .* out =/)).toBeVisible();
+  const chart = page.getByRole("img", { name: "Tokens in and out over time" });
+  await expect(chart).toBeVisible();
+  await expect(chart.locator(".recharts-line")).toHaveCount(2);
+  await page.getByRole("button", { name: "Compare all models" }).click();
+  await expect(page.getByRole("img", { name: "Tokens of every model over time" }).locator(".recharts-line")).toHaveCount(3);
   await detailed(page);
   await page.reload();
   await expect(page.getByText(/Names recorded: .*gpt-4o-mini-2024-07-18/)).toBeVisible();
@@ -441,4 +471,117 @@ test("the layout fits a phone: no sideways scrolling of the page", async ({ page
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, path).toBeLessThanOrEqual(1);
   }
+});
+
+// ------------------------------------------------------------------------- steps, sides and tokens
+
+test("a question shows you on the right and the AI on the left, and the two sides add up to its steps", async ({ page }) => {
+  await page.goto("/conversations");
+  await page.locator(".q-card").filter({ hasText: "What is the cheapest book you have?" }).first().click();
+  const human = page.locator(".bubble-row.human");
+  const ai = page.locator(".bubble-row.ai");
+  await expect(human).toHaveCount(1);
+  const aiCount = await ai.count();
+  expect(aiCount).toBeGreaterThan(1);
+  const box = async (locator: ReturnType<Page["locator"]>) => (await locator.boundingBox())!;
+  expect((await box(human.locator(".bubble"))).x).toBeGreaterThan((await box(ai.first().locator(".bubble"))).x); // right vs left
+  await expect(page.locator(".sides-total")).toHaveText(`${aiCount + 1} steps`);
+  await expect(page.locator(".sides-end.ai strong")).toHaveText(String(aiCount));
+  await expect(page.locator(".sides-end.human strong")).toHaveText("1");
+  // every step shows its tokens: exact for the model, ≈ for your question and the tool results
+  await expect(page.locator(".bubble.model .token-tag, .bubble.answer .token-tag").first()).toContainText(/tokens \(\d/);
+  await expect(page.locator(".bubble.question .token-tag")).toContainText("≈");
+  await expect(page.locator(".bubble.tool .token-tag").first()).toContainText("≈");
+  await page.getByRole("button", { name: "By tokens" }).click();
+  await expect(page.locator(".q-card.on")).toContainText(/\d+ steps/);
+});
+
+test("questions can be sorted by tokens and filtered with one click", async ({ page }) => {
+  await page.goto("/conversations");
+  await page.getByRole("button", { name: "Most tokens" }).click();
+  await expect(page).toHaveURL(/sort=tokens/);
+  const sizes = await page.locator(".q-card .badge.outline").allInnerTexts();
+  const number = (text: string) => parseFloat(text) * (text.includes("k") ? 1000 : 1);
+  expect(number(sizes[0])).toBeGreaterThanOrEqual(number(sizes[sizes.length - 1]));
+  await page.getByRole("group", { name: "Quick filters" }).getByRole("button", { name: "gpt-4o-mini" }).click();
+  await expect(page).toHaveURL(/filter=model/);
+  const count = await page.locator(".q-card").count();
+  expect(count).toBeGreaterThan(0);
+  expect(count).toBeLessThan(35);
+  await page.getByRole("group", { name: "Quick filters" }).getByRole("button", { name: /gpt-4o-mini/ }).click();
+  await expect(page).not.toHaveURL(/filter=/);
+});
+
+test("the usage page shows tokens: total, trend, where they went and the warnings", async ({ page }) => {
+  await page.goto("/spending");
+  await expect(page.getByRole("button", { name: "Tokens" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".headline .big")).toContainText("tokens");
+  await expect(page.getByRole("img", { name: "Tokens over time, coloured by model" })).toBeVisible();
+  for (const tab of ["By model", "By agent", "By tool", "Heaviest questions"]) {
+    await page.getByRole("tab", { name: tab }).click();
+    await expect(page.locator(".share-row").first()).toBeVisible();
+  }
+  await expect(page.getByRole("heading", { name: /Hidden overhead/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Heavy questions" })).toBeVisible();
+  await page.locator(".share-row").first().click();
+  await expect(page).toHaveURL(/\/conversations\?q=/);
+  await page.goto("/spending");
+  await page.getByRole("button", { name: "Dollars" }).click();
+  await expect(page.getByText(/You spent/)).toBeVisible();
+  await expect(page.locator(".share-row").first()).toContainText("tokens");
+});
+
+test("the daily token budget warns on the overview and in things to check", async ({ page }) => {
+  // The test server runs with OBSERGENT_TOKEN_BUDGET=2000 (playwright.config.ts): today's tokens are far over it.
+  await page.goto("/");
+  await expect(page.locator(".budget-ring.over")).toBeVisible();
+  await page.getByRole("list", { name: "Needs attention" }).getByText(/of today's token budget/).click();
+  await expect(page).toHaveURL(/view=tokens/);
+  await expect(page.locator(".budget-bar.over")).toBeVisible();
+  await page.goto("/findings");
+  await expect(page.locator(".finding strong", { hasText: "Today's tokens are close to your budget" })).toBeVisible();
+});
+
+test("tokens are shown wherever a model appears", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("section", { hasText: "Models used" }).getByRole("columnheader", { name: "Tokens" })).toBeVisible();
+  await page.goto("/agents");
+  await expect(page.locator(".gcard", { hasText: "bookshop-agent" })).toContainText("tokens");
+  await expect(page.locator(".flow-node.model").first()).toContainText("tokens");
+  await page.goto("/conversations");
+  await page.locator(".summary-big").getByText("Tokens").isVisible();
+  await page.locator(".thread-side .badge.model").first().hover();
+  await expect(page.locator(".hovercard").first()).toContainText(/tokens · \d+ calls/);
+});
+
+test("the word 'exchanges' is gone and every page header is short", async ({ page }) => {
+  for (const path of ["/", "/conversations", "/agents", "/mcps", "/models", "/spending", "/findings", "/gateway", "/map", "/about"]) {
+    await page.goto(path);
+    await expect(page.locator(".page-head h1")).toBeVisible();
+    const header = `${await page.locator(".page-head").innerText()} ${await page.locator(".page-about").innerText()}`;
+    expect(header.split(/\s+/).filter(Boolean).length, path).toBeLessThanOrEqual(15);
+    expect(await page.locator("body").innerText(), path).not.toMatch(/exchanges?/i);
+  }
+});
+
+test("the welcome tour runs once on the first visit and can be skipped", async ({ page }) => {
+  await page.addInitScript(() => { sessionStorage.setItem("tour-test", "1"); localStorage.removeItem("obsergent.tour"); });
+  await page.goto("/");
+  const tour = page.getByRole("dialog", { name: "Welcome tour" });
+  await expect(tour).toContainText("Every point is a question");
+  await tour.getByRole("button", { name: "Next" }).click();
+  await expect(tour).toContainText("Your latest questions");
+  await tour.getByRole("button", { name: "Skip" }).click();
+  await expect(tour).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem("obsergent.tour"))).toBe("done");
+});
+
+test("the ? key shows the shortcuts, and numbers do not animate when less motion is asked", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await expect(page.locator(".tile").filter({ hasText: "Discussions" })).toContainText("35"); // shown at once, no count-up
+  await page.keyboard.press("?");
+  await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toContainText("Usage & cost");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toHaveCount(0);
 });

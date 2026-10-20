@@ -46,11 +46,21 @@ def test_one_question_is_summarised_with_its_answer_models_and_tools():
     assert summary["question"] == QUESTION and summary["answer"].startswith("We have")
     assert summary["models"] == ["gpt-4o-mini"]  # the dated and undated names are one model
     assert summary["model_calls"] == 3 and summary["tool_calls"] == 3 and summary["status"] == "ok"
-    assert summary["agent"] == "bookshop-agent" and summary["exchanges"] == 1 + 3 + 3
+    assert summary["agent"] == "bookshop-agent" and summary["steps"] == 1 + 3 + 3
+    assert summary["human_messages"] == 1 and summary["ai_messages"] == 6 and summary["exchanges"] == summary["steps"]
+    expected = sum((g.prompt_tokens or 0) + (g.completion_tokens or 0) for g in generations)
+    assert summary["tokens"]["total"] == expected > 0
     thread = build_thread(run, generations)
     assert [item["kind"] for item in thread][0] == "question" and thread[-1]["kind"] == "answer"
     tools = [item for item in thread if item["kind"] == "tool"]
     assert len(tools) == 3 and all(item["result"] for item in tools) and tools[0]["server"] in ("bookshop", "wso2")
+    # the two sides add up to the steps, and every step has its tokens: exact for the model, estimated for the rest
+    assert sum(item["side"] == "human" for item in thread) == 1 and sum(item["side"] == "ai" for item in thread) == 6
+    models = [item for item in thread if item["kind"] in ("model", "answer")]
+    assert [m["tokens"]["input"] for m in models] == [g.prompt_tokens for g in generations]
+    assert all(m["tokens"]["exact"] for m in models) and not any(t["tokens"]["exact"] for t in tools)
+    assert all(t["tokens"]["input"] == max(1, round(len(t["result"]) / 4)) for t in tools)
+    assert thread[0]["tokens"] == {"input": round(len(QUESTION) / 4), "output": 0, "exact": False}
 
 
 def test_the_questions_list_has_the_four_questions_and_not_the_gateway_traffic(store, client):
@@ -77,15 +87,18 @@ def test_a_question_thread_over_the_api(client):
 def test_the_peaks_chart_has_one_point_per_question(client):
     points = client.get("/api/queries/timeline").json()
     assert points["mode"] == "questions" and len(points["points"]) == 4
-    assert all(p["question"] == QUESTION and p["exchanges"] >= 1 for p in points["points"])
+    assert all(p["question"] == QUESTION and p["steps"] >= 1 and p["tokens"]["total"] >= 0 for p in points["points"])
 
 
 def test_many_questions_are_grouped_into_time_slots():
     now = time.time_ns()
-    cards = [{"trace_id": f"{i:032d}", "started_ns": now - i * 60 * 10**9, "question": f"q{i}", "exchanges": 3,
+    cards = [{"trace_id": f"{i:032d}", "started_ns": now - i * 60 * 10**9, "question": f"q{i}",
+              "steps": 3, "human_messages": 1, "ai_messages": 2,
+              "tokens": {"input": 10, "output": 5, "cached": 0, "reasoning": 0, "total": 15},
               "model_calls": 1, "tool_calls": 1, "duration_ms": 5, "status": "ok", "cost": {"usd": 0.001}} for i in range(60)]
     grouped = timeline(cards, 24, now)
     assert grouped["mode"] == "slots" and sum(p["count"] for p in grouped["points"]) == 60
+    assert sum(p["steps"] for p in grouped["points"]) == 180 and sum(p["tokens"]["total"] for p in grouped["points"]) == 900
 
 
 def test_the_overview_counts_discussions_and_tools(client):
@@ -108,6 +121,7 @@ def test_the_agent_graph_follows_the_real_span_tree():
     assert ("step:agent", "model:gpt-4o-mini") in edges and ("step:tools", "tool:search_books") in edges
     assert ("tool:search_books", "mcp:bookshop") in edges and edges[("step:agent", "end")]["calls"] >= 3
     assert nodes["model:gpt-4o-mini"]["calls"] == 10  # all ten model calls, the dated and undated name together
+    assert nodes["model:gpt-4o-mini"]["tokens"] > 0 and nodes["tool:search_books"]["tokens"] == 0
     assert nodes["mcp:bookshop"]["calls"] == 3 and nodes["mcp:wso2"]["calls"] == 6  # one run direct, three via the gateway
     assert ("mcp:wso2", "gateway") in edges and ("mcp:bookshop", "gateway") not in edges
 

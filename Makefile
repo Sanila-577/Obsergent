@@ -55,7 +55,7 @@ up-grpc:  ## same, plus the gRPC receiver on :4317 (first stops anything on eith
 	$(VENV_BIN)/obsergent up --grpc
 
 ##@ Look at what was recorded (terminal; the web UI shows the same)
-.PHONY: traces show sessions drift config prices prices-status
+.PHONY: traces show sessions drift config prices prices-status usage
 traces:  ## list the recorded runs, newest first (LIMIT=N for more, default 20)
 	$(VENV_BIN)/obsergent traces --limit $(or $(LIMIT),20)
 show:  ## one run as a span tree: make show ID=<first characters of a run id from `make traces`>
@@ -67,6 +67,8 @@ drift:  ## MCP servers whose tool descriptions changed since first seen
 	$(VENV_BIN)/obsergent drift
 prices:  ## download the model price lists now (they also refresh by themselves while `make up` runs)
 	$(VENV_BIN)/obsergent prices refresh
+usage:  ## tokens used in the last 24 hours: totals, by model, heaviest questions, daily budget (HOURS=168 for a week)
+	$(VENV_BIN)/obsergent usage --hours $(or $(HOURS),24)
 prices-status:  ## when the price lists were last downloaded
 	$(VENV_BIN)/obsergent prices status
 config:  ## the settings in use (config.yaml + environment)

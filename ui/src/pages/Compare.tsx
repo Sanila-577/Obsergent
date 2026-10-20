@@ -24,7 +24,7 @@ export function Compare() {
 
   return (
     <>
-      <PageHead title={PAGES.compare.title} about={PAGES.compare.about} />
+      <PageHead title={PAGES.compare.title} about={PAGES.compare.about} help={PAGES.compare.help} />
       <div className="card row wrap" style={{ marginBottom: 14 }}><span className="muted">A</span>{options(a)}<ArrowRight size={14} /><span className="muted">B</span>{options(b)}</div>
       {!a || !b ? <Card><EmptyState title="Choose two conversations">Pick them above, or tick two in the Conversations list and press “Compare these 2”.</EmptyState></Card> : (
         <QueryState query={diff}>{(d) => {

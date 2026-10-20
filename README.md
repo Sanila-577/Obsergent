@@ -105,11 +105,11 @@ cd ui && npm run dev                       # terminal 2: http://localhost:5173, 
 
 ### If something does not start
 
-| Symptom                                              | Fix                                                                                                                                                                                    |
-| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `obsergent: command not found`                    | The environment is not active:`source .venv/bin/activate` (the `make` targets work without it)                                                                                     |
-| The browser shows`{"detail":"Not Found"}` at `/` | The UI is not built:`make ui-build`                                                                                                                                                  |
-| `address already in use` on port 7318              | Another`obsergent up` runs. Stop it, or change `server.port` in `config.yaml` (it applies to the server and every client)                                                       |
+| Symptom                                              | Fix                                                                                                                                                                                  |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `obsergent: command not found`                     | The environment is not active:`source .venv/bin/activate` (the `make` targets work without it)                                                                                   |
+| The browser shows`{"detail":"Not Found"}` at `/` | The UI is not built:`make ui-build`                                                                                                                                                |
+| `address already in use` on port 7318              | Another`obsergent up` runs. Stop it, or change `server.port` in `config.yaml` (it applies to the server and every client)                                                      |
 | The UI says "server unreachable"                     | `obsergent up` is not running (or uses another port than the UI's dev proxy: `OBSERGENT_API=http://127.0.0.1:PORT npm run dev`)                                                  |
 | No runs appear                                       | The agent and the server must use the same`config.yaml` (`storage.path`, `server.port`); `obsergent up` prints the database it uses; `obsergent config` shows all settings |
 
@@ -251,27 +251,49 @@ hides ids, raw data and protocol terms; **Detailed** shows everything (ids, raw 
 page shows a three-step guide with a "waiting for data" light that turns into the data when it arrives, and the (?) bubbles
 explain words such as "tokens". Charts and tiles are clickable filters.
 
-| Page                    | What it is for                                                                                                                                                                              |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Overview**            | tiles for **Discussions** (questions asked) and **Tools**, spending, a **peaks chart** (one peak per question: hover to read it, click to open it), **Latest queries asked**, one entry per model |
-| **Conversations**       | your questions as a scrollable strip of cards; pick one to read its thread (you, the model, each tool with its input and result, the answer), or its **Steps** timeline                     |
-| **Agents**              | each agent that answered questions, drawn as a graph: steps, the models, tools and MCP servers it uses; hover follows a path, click shows numbers                                           |
-| **MCPs**                | each MCP server as a card, its tools as cards (inputs in words, usage, speed, risk), and a **Changes** tab (word-by-word differences, gateway-vs-upstream comparison)                       |
-| **Models**              | every model once (the dated and undated names are merged): provider, usage, words, cost, speed, price per million, context size and what it can do                                         |
-| **Spending**            | a headline sentence, a clickable chart of cost over time by model, "Where did the money go?" by model, tool or conversation, and when prices were last checked                             |
-| **Things to check**     | changed tools, risky tools, text that gives the model orders, loops, failures, blocked gateway requests; dismiss and restore                                                                |
-| **Gateway guard**       | what the WSO2 gateway allowed or blocked, where it spent its time, who asked, and which tools should be allowed                                                                             |
-| **Connections**         | layers from apps to the gateway to MCP servers with call counts; a server's tools open on request; hover follows a path                                                                    |
-| **App activity**        | what one app such as Claude Desktop did with one tool server, in order                                                                                                                      |
-| **All activity**        | (Detailed mode) every recorded run, including gateway and app traffic that is not a question, with filters and compare-two                                                                  |
-| **Compare**             | two conversations side by side with the first difference marked                                                                                                                             |
-| **About**               | what Obsergent is in a few words, with a flow you can click through                                                                                                                         |
+| Page                      | What it is for                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Overview**        | four numbers (**Discussions**, **Steps** with 🧑 your / 🤖 AI messages, **Tokens** with the change and the budget ring, **Cost**), a **Needs attention** strip, a **line chart** of questions over time (steps, tokens, cost or time; hover shows the question, its steps, tokens and cost; click opens it), latest questions, models used with their tokens |
+| **Conversations**   | your questions as a scrollable strip (sort by newest, steps, tokens or problems; quick filters); the thread shows **you on the right and the AI on the left**, a counter of the two sides adding up to the steps, and the tokens of every step; or its **Timeline**                                                                                                                  |
+| **Agents**          | each agent that answered questions, drawn as a graph: steps, the models, tools and MCP servers it uses; hover follows a path, click shows numbers                                                                                                                                                                                                                                                |
+| **MCPs**            | each MCP server as a card, its tools as cards (inputs in words, usage, speed, risk), and a **Changes** tab (word-by-word differences, gateway-vs-upstream comparison)                                                                                                                                                                                                                      |
+| **Models**          | every model once (the dated and undated names are merged): provider, **tokens** with a trend line on each card and an in/out chart per model (or all models together), cost, speed, "you used N tokens = $X", context size and what it can do                                                                                                                                              |
+| **Usage & cost**    | a **Tokens \| Dollars** switch: totals and the change from the period before, tokens over time by model, where they went (by model, agent, tool, heaviest questions), the hidden cost of tool descriptions, prompts close to the model's limit, heavy questions, the daily budget; or the dollars view                                                                                     |
+| **Things to check** | changed tools, risky tools, text that gives the model orders, loops, failures, blocked gateway requests; dismiss and restore                                                                                                                                                                                                                                                                     |
+| **Gateway guard**   | what the WSO2 gateway allowed or blocked, where it spent its time, who asked, and which tools should be allowed                                                                                                                                                                                                                                                                                  |
+| **Connections**     | layers from apps to the gateway to MCP servers with call counts; a server's tools open on request; hover follows a path                                                                                                                                                                                                                                                                          |
+| **App activity**    | what one app such as Claude Desktop did with one tool server, in order                                                                                                                                                                                                                                                                                                                           |
+| **All activity**    | (Detailed mode) every recorded run, including gateway and app traffic that is not a question, with filters and compare-two                                                                                                                                                                                                                                                                       |
+| **Compare**         | two conversations side by side with the first difference marked                                                                                                                                                                                                                                                                                                                                  |
+| **About**           | what Obsergent is in a few words, with a flow you can click through                                                                                                                                                                                                                                                                                                                              |
 
 The look is "glass": translucent panels over a soft colour mesh, with solid panels when the system asks for less transparency
 or motion, and text contrast of at least 4.5:1 in both themes (a browser test checks it).
 
-Shortcuts: `⌘K` / `Ctrl+K` search · `g` then `o c a m d s f w n r` go to Overview, Conversations, Agents, MCPs, Models, Spending, Things to check, Gateway guard, Connections, All activity · `←` `→` previous / next question · `j` / `k` move through a timeline · `/` search
-inside a conversation. Also: live updates (refresh every 2 s), 1 h / 6 h / 24 h / 7 d period, dark and light theme.
+**Steps** are the messages of a question: 🧑 the ones you typed and 🤖 the AI's (each model reply and each tool it used). Pages
+keep their header to one short line (the rest is behind the (?)); every number and chart point opens what is behind it; a
+three-step tour runs on the first visit; `?` shows all shortcuts.
+
+Shortcuts: `⌘K` / `Ctrl+K` search · `g` then `o c a m d s f n r` go to Overview, Conversations, Agents, MCPs, Models, Usage &
+cost, Things to check, Connections, All activity · `←` `→` previous / next question or chart point · `Enter` open it · `j` / `k`
+move through a timeline · `?` the shortcut sheet. Also: live updates (refresh every 2 s, with a "new question" pill), last hour /
+today / 7 days, dark and light theme.
+
+## Monitoring tokens
+
+Tokens are the pieces of text a model reads (**in**) and writes (**out**); providers bill by them. Every model call records them
+exactly, so Obsergent shows them everywhere a model appears:
+
+* **Overview:** the Tokens tile (with the change from the period before) and the tokens of each question when you hover the chart.
+* **Conversations:** the tokens of each step. Model replies are exact; your message and tool results are marked "≈" because
+  they have no count of their own (they become part of the next model call's input), so they are estimated from their length.
+* **Usage & cost → Tokens:** totals, a trend by model, where the tokens went, the **hidden overhead** (tool descriptions sent
+  with every model call), prompts that use more than 80 % of the model's context window, and **heavy questions** (5 times your
+  usual, or above `usage.question_token_alert`).
+* **Models:** a trend line per model, and "you used 158k in + 11k out = $0.030" next to the price.
+* **A daily budget (optional):** set `usage.daily_token_budget` in `config.yaml` (or `OBSERGENT_TOKEN_BUDGET`). From
+  `usage.warn_at_percent` (80 %) the Overview shows a ring and a warning, and **Things to check** lists it.
+* **Terminal:** `make usage` (or `obsergent usage --hours 168`) prints totals, by model, the heaviest questions and the budget.
 
 ## Cost of model calls
 
@@ -298,17 +320,17 @@ data is sent). Turn it off with `pricing.auto_refresh: false` in `config.yaml`, 
 They overlap (both store traces) but aim at different things; the same OpenTelemetry data can feed both. Obsergent does
 **not** replace Langfuse.
 
-|                                          | Langfuse                                                   | Obsergent                                                                                                           |
-| ---------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Main subject                             | LLM generations and traces: prompts, completions, cost     | MCP tool calls and the traffic between client, gateway and server                                                    |
-| Recording MCP                            | needs instrumentation in both client and server            | a**proxy** records it with no code change (Claude Desktop, Cursor, any language)                               |
-| Calls inside your agent                  | yes: generations, tokens, cost, prompts, scores            | yes: model calls, tokens, conversation, and each tool call**linked to the real MCP call and gateway decision** |
-| Apps you can't modify                    | not applicable                                             | **sessions** group everything such an app did                                                                  |
-| Tool-description tampering               | not a feature                                              | **drift detection**, plus gateway-vs-upstream comparison                                                       |
-| API gateway view                         | none                                                       | **WSO2 gateway**: decisions, refused calls, time inside the gateway, access-policy suggestions                 |
-| Security findings, agent smells          | not its focus / build your own                             | built in                                                                                                             |
-| Setup                                    | several services (or the cloud)                            | `pip install` + one process + one SQLite file, localhost only                                                      |
-| **Cost**                           | cost dashboards                                            | an estimate per call, conversation and model, from prices that update themselves                                     |
+|                                         | Langfuse                                                   | Obsergent                                                                                                            |
+| --------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Main subject                            | LLM generations and traces: prompts, completions, cost     | MCP tool calls and the traffic between client, gateway and server                                                    |
+| Recording MCP                           | needs instrumentation in both client and server            | a**proxy** records it with no code change (Claude Desktop, Cursor, any language)                               |
+| Calls inside your agent                 | yes: generations, tokens, cost, prompts, scores            | yes: model calls, tokens, conversation, and each tool call**linked to the real MCP call and gateway decision** |
+| Apps you can't modify                   | not applicable                                             | **sessions** group everything such an app did                                                                  |
+| Tool-description tampering              | not a feature                                              | **drift detection**, plus gateway-vs-upstream comparison                                                       |
+| API gateway view                        | none                                                       | **WSO2 gateway**: decisions, refused calls, time inside the gateway, access-policy suggestions                 |
+| Security findings, agent smells         | not its focus / build your own                             | built in                                                                                                             |
+| Setup                                   | several services (or the cloud)                            | `pip install` + one process + one SQLite file, localhost only                                                      |
+| **Cost**                          | cost dashboards                                            | an estimate per call, conversation and model, from prices that update themselves                                     |
 | **Not in Obsergent (on purpose)** | prompt management, evaluations, datasets, scores, accounts |                                                                                                                      |
 
 ---
@@ -372,30 +394,32 @@ Attribute names follow OpenTelemetry (`mcp.method.name`, `gen_ai.tool.name`...).
 | `GET /api/traces`                                                                                        | runs; filters`errors_only, tool, server, model, decision, q, session_id, since, until, before_ns, limit` |
 | `GET /api/traces/{id}` · `/generations` · `/conversation`                                          | one run: spans + smells · model calls · the chat with tool calls linked to MCP calls                     |
 | `GET /api/diff?a=&b=`                                                                                    | two runs and their first divergence                                                                        |
-| `GET /api/stats/overview` · `/api/tools` · `/api/topology?expand=`                                    | dashboards (discussions, tools, latest questions, peaks), per-tool stats, the layered map                  |
-| `GET /api/queries` · `/api/queries/timeline` · `/api/queries/{id}`                                       | the questions asked, the peaks chart data, one question's thread (exchanges in order)                      |
-| `GET /api/models`                                                                                        | one entry per model: usage, cost, speed, price and what it can do                                          |
-| `GET /api/agents` · `/api/agents/{name}/graph`                                                           | agents and the nodes and edges of how each works                                                           |
+| `GET /api/stats/overview` · `/api/tools` · `/api/topology?expand=`                                 | dashboards (discussions, tools, latest questions, peaks), per-tool stats, the layered map                  |
+| `GET /api/queries` · `/api/queries/timeline` · `/api/queries/{id}`                                 | the questions asked (steps, human/AI messages, tokens), the chart data, one question's thread with tokens  |
+| `GET /api/models?hours=`                                                                                 | one entry per model: tokens and their trend, usage, cost, speed, price and what it can do                  |
+| `GET /api/agents` · `/api/agents/{name}/graph`                                                        | agents and the nodes and edges of how each works                                                           |
 | `GET /api/mcps`                                                                                          | MCP servers with their tools, inputs, usage and tool-list changes                                          |
 | `GET /api/sessions` · `/{id}/traces` · `/{id}/timeline`                                            | proxy sessions                                                                                             |
 | `GET /api/servers` · `/{name}/snapshots` · `/{name}/diff` · `/compare?a=&b=`                    | tool lists, drift, version diff, server vs server                                                          |
 | `GET /api/findings` · `POST                                                                             | DELETE /api/findings/{id}/ack`                                                                             |
 | `GET /api/gateway/summary` · `/api/gateway/calls/{activity_id}` · `/api/policy/suggestion?server=` | the gateway view, one call, the policy suggestion                                                          |
 | `GET /api/spending` · `/api/prices` · `POST /api/prices/refresh`                                   | cost by model, tool and over time; the price lists' status; check prices now                               |
+| `GET /api/usage?hours=&buckets=`                                                                         | tokens: totals, over time by model, by model/agent/tool/question, overhead, near the limit, budget, heavy  |
 | `GET /health`                                                                                            | liveness                                                                                                   |
 
 `obsergent proxy-http` (port `proxy.port`, default 7319) serves `POST|GET|DELETE /mcp/{name}`.
 
 ## 10. CLI
 
-| Command                                                                                     | What it does                                                                       |
-| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Command                                                                                    | What it does                                                                       |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
 | `obsergent up [--grpc]`                                                                  | start the server (and the OTLP/gRPC receiver on port 4317)                         |
 | `obsergent proxy --name X -- <cmd>`                                                      | run a stdio MCP server behind the recording proxy                                  |
 | `obsergent proxy-http [--name X] [--url URL] [--port N] [--ca-bundle FILE \| --insecure]` | record a remote Streamable-HTTP server or a gateway (defaults from`config.yaml`) |
 | `obsergent traces [--limit N] [--session ID]` · `show <id>`                           | list runs · print one as a tree                                                   |
 | `obsergent sessions` · `drift [server]`                                               | proxy sessions · tools whose description changed                                  |
 | `obsergent prices refresh \| status \| show <model>`                                       | download the price lists · when they were checked · the price used for a model   |
+| `obsergent usage [--hours 24]` (`make usage`)                                          | tokens used: totals, by model, the heaviest questions, the daily budget            |
 | `obsergent config [key]`                                                                 | show the settings in use (or one, e.g.`server.port`)                             |
 
 `traces`, `show`, `sessions` and `drift` read the SQLite file directly, so they work without the server.
@@ -409,28 +433,31 @@ it, so a value is changed in one place. Precedence: an environment variable, the
 (Obsergent also works with no config file). `obsergent config` prints what is in use; `OBSERGENT_CONFIG=/path/x.yaml`
 uses another file.
 
-| `config.yaml` key                            | Default                                                        | Environment override                      | Meaning                                                                                      |
-| ---------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `server.host` / `server.port`              | `127.0.0.1` / `7318`                                       | `OBSERGENT_HOST` / `OBSERGENT_PORT` | where`obsergent up` listens (UI, REST API, OTLP/HTTP)                                     |
-| `server.grpc_port`                           | `4317`                                                       | `OBSERGENT_GRPC_PORT`                  | the OTLP/gRPC receiver (`up --grpc`)                                                       |
-| `server.endpoint`                            | empty =`http://<host>:<port>`                                | `OBSERGENT_ENDPOINT`                   | where the SDK and proxies send spans                                                         |
-| `storage.path`                               | `~/.obsergent/obsergent.db`                                | `OBSERGENT_DB`                         | the SQLite file                                                                              |
-| `recording.max_attr_chars`                   | `4000`                                                       | `OBSERGENT_MAX_ATTR_CHARS`             | longest value kept in one span attribute                                                     |
-| `proxy.host` / `proxy.port`                | `127.0.0.1` / `7319`                                       | `OBSERGENT_PROXY_PORT`                 | `obsergent proxy-http`                                                                    |
-| `gateway.router`                             | `http://localhost:8080`                                      | `GATEWAY_ROUTER`                        | where MCP traffic enters the WSO2 gateway                                                    |
-| `gateway.controller`                         | `http://localhost:9090/api/management/v1`                    | `GATEWAY_CONTROLLER`                    | the gateway's management API (`make register`)                                             |
-| `gateway.username`                           | `admin`                                                      | `WSO2AP_GW_USERNAME`                    | gateway admin user                                                                           |
-| `gateway.mcp_name` / `gateway.mcp_context` | `wso2` / `/bookshop`                                       |                                           | the proxy's name in Obsergent, the MCP server's path in the gateway                         |
-| `bookshop.http_port`                         | `9100`                                                       | `BOOKSHOP_PORT`                         | the example MCP server over HTTP                                                             |
-| `pricing.enabled`                            | `true`                                                       | `OBSERGENT_PRICING`                    | calculate costs at all                                                                       |
-| `pricing.auto_refresh`                       | `true`                                                       | `OBSERGENT_PRICING_AUTO_REFRESH`       | download prices automatically (the one outbound call)                                        |
-| `pricing.refresh_minutes`                    | `openrouter 30, huggingface 30, models_dev 120, litellm 120` |                                           | how often each price list is checked (a check that finds nothing new is a few hundred bytes) |
-| `pricing.exact_from_provider`                | `true`                                                       | `OBSERGENT_PRICING_EXACT`              | use the cost OpenRouter and xAI send with every response instead of an estimate              |
-| `pricing.credits_per_usd`                    | `1`                                                          |                                           | OpenRouter reports credits; credits per US dollar                                            |
-| `pricing.reprice`                            | `call_time`                                                  | `OBSERGENT_PRICING_REPRICE`            | `call_time` = the price valid when the call was made, `now` = today's price              |
-| `pricing.sources`                            | four public lists                                              |                                           | where prices are downloaded from                                                             |
-| `pricing.local_providers`                    | `[ollama, lmstudio, llamacpp, vllm]`                         |                                           | run on your machine: cost $0                                                                 |
-| `pricing.overrides`                          | `{}`                                                         |                                           | optional prices typed by hand (normally empty)                                               |
+| `config.yaml` key                            | Default                                                        | Environment override                    | Meaning                                                                                      |
+| ---------------------------------------------- | -------------------------------------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `server.host` / `server.port`              | `127.0.0.1` / `7318`                                       | `OBSERGENT_HOST` / `OBSERGENT_PORT` | where`obsergent up` listens (UI, REST API, OTLP/HTTP)                                      |
+| `server.grpc_port`                           | `4317`                                                       | `OBSERGENT_GRPC_PORT`                 | the OTLP/gRPC receiver (`up --grpc`)                                                       |
+| `server.endpoint`                            | empty =`http://<host>:<port>`                                | `OBSERGENT_ENDPOINT`                  | where the SDK and proxies send spans                                                         |
+| `storage.path`                               | `~/.obsergent/obsergent.db`                                  | `OBSERGENT_DB`                        | the SQLite file                                                                              |
+| `recording.max_attr_chars`                   | `4000`                                                       | `OBSERGENT_MAX_ATTR_CHARS`            | longest value kept in one span attribute                                                     |
+| `proxy.host` / `proxy.port`                | `127.0.0.1` / `7319`                                       | `OBSERGENT_PROXY_PORT`                | `obsergent proxy-http`                                                                     |
+| `gateway.router`                             | `http://localhost:8080`                                      | `GATEWAY_ROUTER`                      | where MCP traffic enters the WSO2 gateway                                                    |
+| `gateway.controller`                         | `http://localhost:9090/api/management/v1`                    | `GATEWAY_CONTROLLER`                  | the gateway's management API (`make register`)                                             |
+| `gateway.username`                           | `admin`                                                      | `WSO2AP_GW_USERNAME`                  | gateway admin user                                                                           |
+| `gateway.mcp_name` / `gateway.mcp_context` | `wso2` / `/bookshop`                                       |                                         | the proxy's name in Obsergent, the MCP server's path in the gateway                          |
+| `bookshop.http_port`                         | `9100`                                                       | `BOOKSHOP_PORT`                       | the example MCP server over HTTP                                                             |
+| `pricing.enabled`                            | `true`                                                       | `OBSERGENT_PRICING`                   | calculate costs at all                                                                       |
+| `pricing.auto_refresh`                       | `true`                                                       | `OBSERGENT_PRICING_AUTO_REFRESH`      | download prices automatically (the one outbound call)                                        |
+| `pricing.refresh_minutes`                    | `openrouter 30, huggingface 30, models_dev 120, litellm 120` |                                         | how often each price list is checked (a check that finds nothing new is a few hundred bytes) |
+| `pricing.exact_from_provider`                | `true`                                                       | `OBSERGENT_PRICING_EXACT`             | use the cost OpenRouter and xAI send with every response instead of an estimate              |
+| `pricing.credits_per_usd`                    | `1`                                                          |                                         | OpenRouter reports credits; credits per US dollar                                            |
+| `pricing.reprice`                            | `call_time`                                                  | `OBSERGENT_PRICING_REPRICE`           | `call_time` = the price valid when the call was made, `now` = today's price              |
+| `pricing.sources`                            | four public lists                                              |                                         | where prices are downloaded from                                                             |
+| `pricing.local_providers`                    | `[ollama, lmstudio, llamacpp, vllm]`                         |                                         | run on your machine: cost $0                                                                 |
+| `pricing.overrides`                          | `{}`                                                         |                                         | optional prices typed by hand (normally empty)                                               |
+| `usage.daily_token_budget`                   | `0` (no budget)                                              | `OBSERGENT_TOKEN_BUDGET`              | tokens allowed per day; warnings on the Overview and in Things to check                      |
+| `usage.warn_at_percent`                      | `80`                                                         |                                         | from which share of the budget the warning starts                                            |
+| `usage.question_token_alert`                 | `0` (5x the usual)                                           |                                         | flag a single question above this many tokens                                                |
 
 Secrets are never in `config.yaml`: the gateway password is the environment variable `WSO2AP_GW_PASSWORD`, and the language
 model's settings and API keys are in `.env` (copied from `.env.example`, git-ignored; section 1, Step 2). The UI's dev server
@@ -452,7 +479,7 @@ src/obsergent/
   proxy/      recorder.py  stdio.py  http.py  gateway.py  identity.py  sessions.py  redact.py
   ingest/     otlp.py  gateway.py  pipeline.py
   storage/    base.py  sqlite.py
-  analysis/   smells diff safety generations findings toolsdiff policy gateway_view stats pricing modelnames queries agentgraph mcps
+  analysis/   smells diff safety generations findings toolsdiff policy gateway_view stats pricing modelnames queries agentgraph mcps usage
   server/     app.py  grpc_receiver.py  price_sync.py  costing.py  catalog.py  static/   (static/ = the built web UI)
   sdk/        setup.py
 ui/           React app: src/pages, src/components, src/lib, src/api; e2e/ (Playwright)

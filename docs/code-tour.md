@@ -246,7 +246,9 @@ Each line tells you *what the file is for* and *what to look for*.
 22. `pages/Conversations.tsx` → `components/Thread.tsx` (the question strip and the thread of one question), then
     `pages/Runs.tsx` → `pages/RunDetail.tsx` → `components/Waterfall.tsx` + `lib/trace.ts` (the tree and timeline maths).
 23. The graphs: `lib/layout.ts` (layers, loops, hover paths: pure functions with tests) → `components/FlowGraph.tsx` →
-    `pages/Agents.tsx` and `pages/MapPage.tsx`. Backend: `analysis/agentgraph.py`, `analysis/queries.py`, `server/catalog.py`.
+    `pages/Agents.tsx` and `pages/MapPage.tsx`. Backend: `analysis/agentgraph.py`, `analysis/queries.py` (steps, the two sides,
+    tokens per step), `analysis/usage.py` (token monitoring, budget, heavy questions), `server/catalog.py`.
+    The Overview's line chart is `components/StepsChart.tsx`; the model trends `components/ModelTokensChart.tsx`.
 24. The other pages (`Overview`, `Models`, `Mcps`, `Sessions`, `Findings`, `Gateway`, `Compare`, `About`) all follow the same
     pattern: `useQuery` → API → draw. Their logic is small; read them when you want to see a feature. `lib/models.ts` shows one
     name per model (the same rules as `analysis/modelnames.py`); `styles/glass.css` is the glass look.

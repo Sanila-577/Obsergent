@@ -15,6 +15,9 @@ import asyncio
 # sys: exit codes and stderr.
 import sys
 
+# time: the current time for `usage`.
+import time
+
 # datetime formats timestamps for printing.
 from datetime import datetime
 
@@ -35,10 +38,11 @@ from obsergent.proxy.http import create_proxy_app
 from obsergent.proxy.stdio import StdioProxy
 
 # Starts the optional gRPC receiver.
-from obsergent.server import price_sync
+from obsergent.server import catalog, price_sync
 
 # Builds the Obsergent server web app.
 from obsergent.server.app import create_app
+from obsergent.server.costing import CostCalculator
 from obsergent.server.grpc_receiver import start_grpc_server
 
 # The database.
@@ -85,6 +89,10 @@ def build_parser() -> argparse.ArgumentParser:
     prices.add_argument("action", choices=["refresh", "status", "show"])
     prices.add_argument("model", nargs="?", help="for `show`: a model name, e.g. gpt-4o-mini")
     prices.add_argument("--provider", help="for `show`: the provider, e.g. openai, groq, openrouter")
+
+    # Command `usage`: how many tokens the models used.
+    usage = sub.add_parser("usage", help="token usage: totals, by model, the heaviest questions, the daily budget")
+    usage.add_argument("--hours", type=float, default=24, help="the period to look at (default: the last 24 hours)")
 
     # Command `config`: print the settings in use (the Makefile reads ports from here).
     cfg = sub.add_parser("config", help="show the settings (config.yaml + environment), or one value")
@@ -199,6 +207,31 @@ def cmd_prices(args) -> int:
     return 0
 
 
+# `obsergent usage`: the tokens used in a period (the same numbers as the Usage page).
+def cmd_usage(args) -> int:
+    store = SQLiteStorage(config.db_path())
+    calculator = CostCalculator(store)
+    now = time.time_ns()
+    report = catalog.usage(store, calculator, now - int(args.hours * 3600 * 1e9), now, 24)
+    totals = report["totals"]
+    if not totals["calls"]:
+        print(f"no model calls in the last {args.hours:g} hours")
+        return 0
+    print(f"last {args.hours:g} h: {totals['total']:,} tokens ({totals['input']:,} in, {totals['output']:,} out, "
+          f"{totals['cached']:,} cached) in {totals['calls']} model calls, {totals['questions']} questions "
+          f"(about {totals['avg_per_question']:,.0f} per question)")
+    print("\nby model:")
+    for model in report["by_model"]:
+        print(f"  {model['model']:<28} {model['total']:>10,} tokens  {model['calls']:>4} calls  ${model['usd']:.4f}")
+    print("\nheaviest questions:")
+    for question in report["by_question"][:5]:
+        print(f"  {question['tokens']['total']:>10,}  {question['trace_id'][:12]}  {question['question'][:70]}")
+    budget = report["budget"]
+    print("\nbudget: " + (f"{budget['used']:,} of {budget['budget']:,} tokens today ({budget['share']:.0%}, {budget['level']})"
+                           if budget["enabled"] else "none (set usage.daily_token_budget in config.yaml)"))
+    return 0
+
+
 # `obsergent config [key]`: print the settings in use.
 def cmd_config(args) -> int:
     if args.key:
@@ -305,7 +338,8 @@ def cmd_drift(args) -> int:
 
 # Command name -> function that runs it.
 COMMANDS = {"up": cmd_up, "proxy": cmd_proxy, "proxy-http": cmd_proxy_http, "traces": cmd_traces,
-            "config": cmd_config, "prices": cmd_prices, "show": cmd_show, "sessions": cmd_sessions, "drift": cmd_drift}
+            "config": cmd_config, "prices": cmd_prices, "usage": cmd_usage,
+            "show": cmd_show, "sessions": cmd_sessions, "drift": cmd_drift}
 
 
 # The entry point: `obsergent` on the command line calls this (see pyproject.toml).

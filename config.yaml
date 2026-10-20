@@ -61,3 +61,8 @@ pricing:
   local_providers: [ollama, lmstudio, llamacpp, vllm]   # run on your machine: cost $0, shown as "local"
   overrides: {}          # optional, normally empty. Example: {"my-model": {input_per_million: 0.5, output_per_million: 1.5}}
 
+# Token monitoring. Tokens are the pieces of text models read and write (about three quarters of a word); providers bill by them.
+usage:
+  daily_token_budget: 0      # [OBSERGENT_TOKEN_BUDGET] tokens you allow per day; 0 = no budget (no warning)
+  warn_at_percent: 80        # warn on the Overview and in Things to check from this share of the budget
+  question_token_alert: 0    # flag a single question above this many tokens; 0 = flag questions far above your usual

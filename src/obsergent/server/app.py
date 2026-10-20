@@ -48,6 +48,7 @@ from obsergent.analysis.findings import (
     result_findings,
     smell_findings,
     tool_list_findings,
+    usage_findings,
 )
 
 # Summaries for the Gateway page.
@@ -76,6 +77,7 @@ from obsergent.analysis.stats import latency_summary
 
 # Text diff between two tool lists.
 from obsergent.analysis.toolsdiff import diff_tool_lists
+from obsergent.analysis.usage import change, heavy_questions
 
 # Convert incoming OTLP bodies to Span objects.
 from obsergent.ingest.otlp import parse_export_json, parse_export_request
@@ -152,9 +154,14 @@ def create_app(storage: Backend | None = None) -> FastAPI:
         # Spans on both sides that carry a gateway decision.
         gateway_calls = store.find_spans("gateway.decision", since_ns=since, limit=2000)  # both sides of each call
         # Join the four sources into one list.
+        # Token usage: today's budget and questions far above the usual.
+        calculator = CostCalculator(store)
+        cards = catalog.question_summaries(store, calculator, 500, since_ns=since)
+        heavy = heavy_questions(cards, config.usage_question_token_alert())
         found = (tool_list_findings(snapshots) + result_findings(recent_calls)
                  + smell_findings([store.get_trace(t["trace_id"]) for t in recent_traces])
-                 + gateway_findings(gateway_calls))
+                 + gateway_findings(gateway_calls) + usage_findings(catalog.budget(store, calculator), heavy, time.time_ns()))
+        calculator.finish()
         # Sort by severity and attach the "acknowledged" flag.
         return order_findings(found, store.list_acknowledged())
 
@@ -271,19 +278,29 @@ def create_app(storage: Backend | None = None) -> FastAPI:
 
     # ----------------------------------------------------------------- models
     @app.get("/api/models")
-    def list_models():
-        """One entry per model (a dated and an undated name are the same model): usage, tokens, cost, speed, price and
-        what the model can do (context window, abilities, open weights)."""
+    def list_models(hours: float | None = DEFAULT_WINDOW_HOURS, buckets: int = Query(24, ge=1, le=96)):
+        """One entry per model (a dated and an undated name are the same model): usage, tokens, cost, speed, price, what
+        the model can do (context window, abilities, open weights) and its token trend over the last `hours`."""
         calculator = CostCalculator(store)
-        models = catalog.model_catalog(store, calculator)
+        models = catalog.model_catalog(store, calculator, window_start(hours), time.time_ns(), buckets)
         calculator.finish()
         return models
+
+    # ------------------------------------------------------------------- usage
+    @app.get("/api/usage")
+    def get_usage(hours: float = DEFAULT_WINDOW_HOURS, buckets: int = Query(24, ge=1, le=96)):
+        """Token usage: totals, over time by model, by model/agent/question/tool, tool-description overhead, prompts close to
+        the model's limit, the daily budget, heavy questions and the change from the period before."""
+        calculator = CostCalculator(store)
+        report = catalog.usage(store, calculator, window_start(hours), time.time_ns(), buckets)
+        calculator.finish()
+        return report | {"window_hours": hours}
 
     # ---------------------------------------------------------------- questions
     @app.get("/api/queries")
     def list_queries(hours: float | None = None, limit: int = Query(50, ge=1, le=200), before_ns: int | None = None,
                      q: str | None = None, since: float | None = None, until: float | None = None):
-        """The questions people asked, newest first: question, answer, time, cost, models, tools, exchanges, status."""
+        """The questions people asked, newest first: question, answer, time, cost, models, tools, steps, tokens, status."""
         calculator = CostCalculator(store)
         cards = catalog.question_summaries(
             store, calculator, limit, since_ns=seconds_to_ns(since) or window_start(hours),
@@ -301,7 +318,7 @@ def create_app(storage: Backend | None = None) -> FastAPI:
 
     @app.get("/api/queries/{trace_id}")
     def get_query(trace_id: str):
-        """One question with its whole thread: the exchanges in order, each tool call with its arguments and result."""
+        """One question with its whole thread: the steps in order (with their tokens), each tool with its input and result."""
         full_id, spans = spans_of(trace_id)
         generations = find_generations(spans)
         calculator = CostCalculator(store)
@@ -484,9 +501,19 @@ def create_app(storage: Backend | None = None) -> FastAPI:
         mcps = catalog.mcp_catalog(store)
         calculator = CostCalculator(store)
         cards = catalog.question_summaries(store, calculator, 500, since_ns=since)
+        # Tokens in this window, in the window before it (for "+12 %") and today's budget.
+        rows = catalog.call_rows(store, calculator, since)
+        before = catalog.tokens_of(catalog.call_rows(store, calculator, since - (now - since), since))
+        tokens = {kind: sum(row[kind] for row in rows) for kind in ("input", "output", "cached", "reasoning")}
+        tokens |= {"total": tokens["input"] + tokens["output"], "change": change(tokens["input"] + tokens["output"], before),
+                   "budget": catalog.budget(store, calculator)}
         calculator.finish()
         return {
-            "discussions": counts["questions"], "mcps": len(mcps),
+            "discussions": counts["questions"], "mcps": len(mcps), "tokens": tokens,
+            "steps_total": sum(c["steps"] for c in cards), "human_messages": sum(c["human_messages"] for c in cards),
+            "ai_messages": sum(c["ai_messages"] for c in cards),
+            "problem_questions": sum(c["status"] == "problem" for c in cards),
+            "heavy_questions": len(heavy_questions(cards, config.usage_question_token_alert())),
             "tools_total": len({t["name"] for mcp in mcps for t in mcp["tools"] if not t.get("removed")}) or len(per_tool),
             "latest_queries": cards[:6], "timeline": query_timeline(cards, hours, now),
             "window_hours": hours, "counts": counts,

@@ -116,3 +116,11 @@ A call older than the first price Obsergent saw for that model uses the oldest k
 * `pricing.auto_refresh: false`: nothing is downloaded (costs use the last downloaded prices and overrides): no outbound call.
 * `pricing.exact_from_provider: false`: always show estimates.
 * `pricing.enabled: false`: no costs at all.
+
+## Tokens
+
+The cost is built from tokens, and the tokens are worth watching on their own (they show how much an agent reads and writes even
+when the model is free). The Usage & cost page has a **Tokens** view, the Overview a Tokens tile, and `make usage` prints the same
+numbers. Totals are input + output; cached tokens are part of the input, reasoning tokens part of the output. A daily budget can be
+set with `usage.daily_token_budget` in `config.yaml`; questions far above the usual are flagged in Things to check. See the
+README section "Monitoring tokens".

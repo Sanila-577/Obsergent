@@ -87,7 +87,7 @@ export function Runs() {
   // Tool names for the Tool filter's suggestions.
   const tools = useQuery({ queryKey: ["tools", 168], queryFn: () => api.tools(168) });
   // Model names for the Model filter.
-  const models = useQuery({ queryKey: ["models"], queryFn: api.models });
+  const models = useQuery({ queryKey: ["models"], queryFn: () => api.models() });
 
   // All loaded pages joined.
   const rows: TraceSummary[] = runs.data?.pages.flat() ?? [];
@@ -98,7 +98,7 @@ export function Runs() {
 
   return (
     <>
-      <PageHead title={PAGES.runs.title} about={PAGES.runs.about} sub={rows.length ? `${rows.length}${runs.hasNextPage ? "+" : ""} shown` : undefined}>
+      <PageHead title={PAGES.runs.title} about={PAGES.runs.about} help={PAGES.runs.help} sub={rows.length ? `${rows.length}${runs.hasNextPage ? "+" : ""} shown` : undefined}>
         {picked.length === 2 && <button className="primary" onClick={() => navigate(`/compare?a=${picked[0]}&b=${picked[1]}`)}><GitCompare size={15} /> Compare these 2</button>}
         {picked.length === 1 && <span className="muted">Pick one more conversation to compare</span>}
       </PageHead>

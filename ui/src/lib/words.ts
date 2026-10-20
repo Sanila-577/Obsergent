@@ -1,34 +1,38 @@
 // Every label, description and help text of the app in one place, in plain words. Pages import from here, so a
 // word is changed once. "Simple" mode (the default) shows these; "Detailed" mode adds ids, raw data and protocol terms.
 
-/** Navigation labels and the one-line description under each page title. */
+/** Navigation labels, a short line under each title (8 words at most) and the longer explanation behind its (?). */
 export const PAGES = {
-  overview: { title: "Overview", about: "How everything is doing right now." },
-  conversations: { title: "Conversations", about: "The questions you asked. Pick one to read everything that happened until it was answered." },
-  agents: { title: "Agents", about: "The agents that answered your questions, and how each one works: its steps, models and tools." },
-  mcps: { title: "MCPs", about: "The tool servers your agents use (MCP servers), the tools each one offers, and whether they changed." },
-  models: { title: "Models", about: "The AI models that were used: who provides them, how much they were used, what they cost and what they can do." },
-  runs: { title: "All activity", about: "Everything that was recorded, including gateway and app traffic that is not a question. Newest first." },
-  sessions: { title: "App activity", about: "What apps like Claude Desktop or Cursor did with a tool server, in order." },
-  spending: { title: "Spending", about: "What your AI models cost. Prices are looked up automatically." },
-  findings: { title: "Things to check", about: "Problems found automatically: loops, failures, risky tools and blocked requests." },
-  gateway: { title: "Gateway guard", about: "What the gateway in front of your tools allowed or blocked, and how long it took." },
-  map: { title: "Connections", about: "Who talks to which tool server. Hover a box to follow its path, click it for details." },
-  compare: { title: "Compare", about: "Put two conversations side by side and see where they first differ." },
-  about: { title: "About", about: "What Obsergent is, in one minute." },
+  overview: { title: "Overview", about: "How your agents are doing.", help: "Questions, steps, tokens and cost for the chosen period. Click any number or point to see what is behind it." },
+  conversations: { title: "Conversations", about: "Every question, step by step.", help: "Pick a question to read everything that happened until it was answered: what you asked (right) and what the AI did (left)." },
+  agents: { title: "Agents", about: "How each agent works.", help: "Each agent's steps, the models and tools it uses and the MCP servers behind them, drawn as a graph." },
+  mcps: { title: "MCPs", about: "Tool servers and their tools.", help: "The MCP servers your agents use, the tools each offers, how they are used and whether they changed." },
+  models: { title: "Models", about: "Models, tokens and prices.", help: "Every AI model that was used: provider, tokens, cost, speed, price and what it can do." },
+  runs: { title: "All activity", about: "Everything recorded, newest first.", help: "Every recorded run, including gateway and app traffic that is not a question." },
+  sessions: { title: "App activity", about: "What apps did with tool servers.", help: "What apps like Claude Desktop or Cursor did with a tool server, in order." },
+  spending: { title: "Usage & cost", about: "Tokens and dollars, where they went.", help: "How many tokens your models used and what they cost. Prices are looked up automatically." },
+  findings: { title: "Things to check", about: "Problems found for you.", help: "Loops, failures, risky or changed tools, blocked requests, token budget and heavy questions." },
+  gateway: { title: "Gateway guard", about: "What the gateway allowed or blocked.", help: "What the gateway in front of your tools allowed or blocked, and how long it took." },
+  map: { title: "Connections", about: "Who talks to which tool server.", help: "Hover a box to follow its path, click it for details." },
+  compare: { title: "Compare", about: "Two conversations side by side.", help: "See where two conversations first differ." },
+  about: { title: "About", about: "Obsergent in one minute.", help: "What Obsergent is and how it works." },
 } as const;
 
 /** Short explanations shown in the (?) bubbles. */
 export const HELP = {
   conversation: "One request that was handled from start to finish, for example one question you asked your agent.",
   discussion: "One question you asked an agent, together with everything that happened until it answered.",
-  exchange: "One message in a discussion: your question, a model's reply, or a tool being used with its result.",
+  step: "One message in a question: yours (human) or the AI's (a model reply or a tool it used).",
+  human: "Messages you typed.",
+  ai: "Messages from the AI side: each model reply and each tool it used.",
+  event: "One recorded event inside a run: a model call, a tool call, a request through the gateway.",
   mcp: "MCP is the standard way for an AI agent to use tools. An MCP server is a program that offers some tools.",
-  step: "One thing that happened inside a conversation: a model thinking, a tool being used, a request passing through the gateway.",
   action: "A tool your agent used, for example 'search_books'. Also called a tool call.",
   tool: "Something an agent can do, for example 'search_books'. Each MCP server offers a few tools.",
-  tokens: "Models read and write text in small pieces called tokens (about three quarters of a word). Prices are per token.",
-  cost: "An estimate: the words processed times the model's current price per word. Models on your own computer are free.",
+  tokens: "Models read and write text in small pieces called tokens (about three quarters of a word). Providers bill per token.",
+  estimated: "Estimated from the text length (about 4 characters per token): it becomes part of the next model call's input.",
+  budget: "A daily token limit you can set in config.yaml (usage.daily_token_budget). Obsergent warns before it is reached.",
+  cost: "An estimate: the tokens used times the model's price per token. Models on your own computer are free.",
   typical: "Half of the calls were faster than this.",
   slowest: "Only 1 in 20 calls was slower than this (the 95th percentile).",
   blocked: "The gateway refused the request: not logged in, not allowed, or stopped by a rule.",
@@ -57,5 +61,7 @@ export const FINDING_WORDS: Record<string, string> = {
   loop: "The agent repeated the same action",
   tool_error: "An action failed",
   slow_tool: "An action was very slow",
+  token_budget: "Today's tokens are close to your budget",
+  heavy_question: "A question used far more tokens than usual",
   gateway_decision: "The gateway blocked a request",
 };

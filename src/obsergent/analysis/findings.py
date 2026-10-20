@@ -7,6 +7,7 @@ when the list is rebuilt. Kinds:
     prompt_injection                           instruction-like text in a tool description or a tool result
     loop / tool_error / slow_tool              "agent smells" found in a run
     gateway_decision                           calls the gateway refused (unauthorized / forbidden / throttled / denied)
+    token_budget / heavy_question              today's tokens near or over the budget; a question far above the usual
 
 Pure functions: the caller (the API) reads the data, this module only decides what is a finding.
 """
@@ -182,3 +183,25 @@ def order_findings(findings: list[dict], acknowledged: dict[str, int]) -> list[d
         finding["acknowledged_ns"] = acknowledged.get(finding["id"])
     # Severity first, then newest first.
     return sorted(findings, key=lambda f: (SEVERITY_ORDER.get(f["severity"], 3), -f["seen_ns"]))
+
+
+# Findings about token usage (the budget of config.yaml and unusually heavy questions).
+def usage_findings(budget: dict, heavy: list[dict], now_ns: int) -> list[dict]:
+    """A finding when today's tokens reach the warning share of the budget, and one per heavy question."""
+    found = []
+    if budget.get("enabled") and budget["level"] in ("warn", "over"):
+        severity = "high" if budget["level"] == "over" else "medium"
+        found.append(make("token_budget", severity, f"Today's tokens are at {budget['share']:.0%} of your daily budget "
+                          f"({budget['used']:,} of {budget['budget']:,})", now_ns,
+                          ("budget", time_day(now_ns), budget["level"])))
+    for question in heavy:
+        usual = f", {question['times_usual']:.0f}x the usual" if question.get("times_usual") else ""
+        found.append(make("heavy_question", "low", f"A question used {question['tokens']:,} tokens{usual}: "
+                          f"\"{question['question'][:80]}\"", question["started_ns"], (question["trace_id"],),
+                          trace_id=question["trace_id"]))
+    return found
+
+
+# The day of a moment, so the budget finding is a new one each day.
+def time_day(ns: int) -> int:
+    return ns // (24 * 3600 * 1_000_000_000)

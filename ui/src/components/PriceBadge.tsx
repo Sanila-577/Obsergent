@@ -31,7 +31,7 @@ export function PriceBadge({ detailed }: { detailed: boolean }) {
       {changes.length > 0 && (
         <div className="notice" role="note" style={{ marginTop: 8 }}>
           <strong>Prices changed recently:</strong>{" "}
-          {changes.slice(0, 3).map((c) => `${c.model}: ${formatMoney(c.old_input)} → ${formatMoney(c.new_input)} in, ${formatMoney(c.old_output)} → ${formatMoney(c.new_output)} out (per million words, ${timeAgo(c.effective_from_ns)})`).join("; ")}.
+          {changes.slice(0, 3).map((c) => `${c.model}: ${formatMoney(c.old_input)} → ${formatMoney(c.new_input)} in, ${formatMoney(c.old_output)} → ${formatMoney(c.new_output)} out (per million tokens, ${timeAgo(c.effective_from_ns)})`).join("; ")}.
           Calls made before a change keep the price that was valid then.
         </div>
       )}

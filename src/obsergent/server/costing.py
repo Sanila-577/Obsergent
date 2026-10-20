@@ -99,6 +99,17 @@ def first_question(generations: list[Generation]) -> str:
     return ""
 
 
+def time_slots(since_ns: int | None, until_ns: int, buckets: int, times: list[int]) -> tuple[int, int]:
+    """Where the first time slot starts and how wide each slot is: the window, or from the oldest moment when there is none."""
+    start = since_ns if since_ns is not None else min(times, default=until_ns)
+    return start, max(1, (until_ns - start) // buckets)
+
+
+def slot_of(moment_ns: int, start: int, width: int, buckets: int) -> int:
+    """The number of the time slot a moment falls in (moments outside the window go to the first or last slot)."""
+    return min(buckets - 1, max(0, (moment_ns - start) // width))
+
+
 def spending(store: Backend, since_ns: int | None, until_ns: int, buckets: int, reprice: str | None = None,
              detail: bool = True) -> dict:
     """Everything the Spending page shows for a time window (`detail=False` skips the slow per-run parts)."""
@@ -108,8 +119,7 @@ def spending(store: Backend, since_ns: int | None, until_ns: int, buckets: int, 
     spans = store.list_llm_spans(since_ns)
     generations = [to_generation(span) for span in spans]
     costs = [calculator.of(generation) for generation in generations]
-    start = since_ns if since_ns is not None else min((g.start_ns for g in generations), default=until_ns)
-    width = max(1, (until_ns - start) // buckets)
+    start, width = time_slots(since_ns, until_ns, buckets, [g.start_ns for g in generations])
 
     by_model: dict[tuple, dict] = {}
     series = [{"start_ns": start + index * width, "usd": 0.0, "by_model": {}} for index in range(buckets)]
@@ -118,17 +128,20 @@ def spending(store: Backend, since_ns: int | None, until_ns: int, buckets: int, 
         # One entry per model: the dated and the undated name of the same model are added together.
         key = group_key(generation.model, generation.provider)
         entry = by_model.setdefault(key, {"provider": generation.provider or "", "model": key[1], "usd": 0.0, "calls": 0,
-                                         "prompt_tokens": 0, "completion_tokens": 0, "status": cost.status,
+                                         "prompt_tokens": 0, "completion_tokens": 0, "cached_tokens": 0,
+                                         "reasoning_tokens": 0, "status": cost.status,
                                          "confidence": cost.confidence, "note": cost.note, "source": cost.source})
         entry["calls"] += 1
         entry["prompt_tokens"] += generation.prompt_tokens or 0
         entry["completion_tokens"] += generation.completion_tokens or 0
+        entry["cached_tokens"] += generation.cache_read_tokens
+        entry["reasoning_tokens"] += generation.reasoning_tokens
         entry["usd"] += cost.usd or 0.0
         trace = by_trace.setdefault(span.trace_id, {"trace_id": span.trace_id, "usd": 0.0, "calls": 0, "start_ns": span.start_ns})
         trace["usd"] += cost.usd or 0.0
         trace["calls"] += 1
         trace["start_ns"] = min(trace["start_ns"], span.start_ns)
-        slot = min(buckets - 1, max(0, (generation.start_ns - start) // width))
+        slot = slot_of(generation.start_ns, start, width, buckets)
         series[slot]["usd"] += cost.usd or 0.0
         series[slot]["by_model"][key[1]] = series[slot]["by_model"].get(key[1], 0.0) + (cost.usd or 0.0)
 

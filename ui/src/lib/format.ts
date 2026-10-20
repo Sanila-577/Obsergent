@@ -86,8 +86,24 @@ export function moneyInWords(usd: number | null | undefined): string {
   return formatMoney(usd);
 }
 
-/** Tokens as people say it: 1037 -> "1,037 words (tokens)". A token is about three quarters of a word. */
+/** Tokens, short: 850 -> "850", 1234 -> "1.2k", 157600 -> "158k", 2_400_000 -> "2.4M". Missing -> "-". */
 export function formatTokens(n: number | null | undefined): string {
-  if (n === null || n === undefined) return "-";
-  return n >= 10_000 ? `${(n / 1000).toFixed(1)}k` : n.toLocaleString();
+  if (n === null || n === undefined || Number.isNaN(n)) return "-";
+  if (n < 1000) return String(Math.round(n));
+  if (n < 100_000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  if (n < 1_000_000) return `${Math.round(n / 1000)}k`;
+  return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+}
+
+/** "3.4k tokens (3.1k in · 300 out)": the total with its two parts. */
+export function tokensInOut(tokens: { input: number; output: number } | null | undefined): string {
+  if (!tokens) return "-";
+  return `${formatTokens(tokens.input + tokens.output)} tokens (${formatTokens(tokens.input)} in · ${formatTokens(tokens.output)} out)`;
+}
+
+/** +0.12 -> "↑ 12%", -0.3 -> "↓ 30%", null -> "" (nothing to compare with). */
+export function formatChange(change: number | null | undefined): string {
+  if (change === null || change === undefined || !Number.isFinite(change)) return "";
+  const percent = Math.round(Math.abs(change) * 100);
+  return percent === 0 ? "same as before" : `${change > 0 ? "↑" : "↓"} ${percent}%`;
 }

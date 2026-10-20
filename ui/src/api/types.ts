@@ -160,6 +160,44 @@ export interface ModelEntry extends ModelUsage {
   price: { input: number | null; output: number | null; cache_read: number | null; cache_write: number | null;
            source: string; confidence: string; since_ns: number } | null;
   info: ModelInfo;
+  tokens: Tokens;
+  /** The token trend over the chosen period, one entry per time slot. */
+  series?: { start_ns: number; input: number; output: number; cached: number; calls: number; usd: number }[];
+}
+
+/** Today's tokens against the daily budget of config.yaml. */
+export interface TokenBudget {
+  enabled: boolean;
+  used: number;
+  budget?: number;
+  share?: number;
+  level?: "ok" | "warn" | "over";
+  warn_at_percent?: number;
+}
+
+/** `GET /api/usage`: token monitoring. */
+export interface Usage {
+  window_hours: number;
+  totals: Tokens & { calls: number; questions: number; avg_per_question: number; avg_per_call: number; cache_share: number };
+  series: (Tokens & { start_ns: number; calls: number; by_model: Record<string, number> })[];
+  by_model: (Tokens & { model: string; provider: string; calls: number; usd: number })[];
+  by_agent: (Tokens & { agent: string; questions: number })[];
+  by_tool: { tool: string; calls: number; total: number }[];
+  by_question: { trace_id: string; question: string; agent: string | null; steps: number | null; started_ns: number; tokens: Tokens }[];
+  tool_definitions: { total: number; per_call: number };
+  near_limit: { trace_id: string; span_id: string | null; model: string; input: number; context: number; share: number }[];
+  budget: TokenBudget;
+  change: number | null;
+  heavy: { trace_id: string; question: string; tokens: number; started_ns: number; times_usual: number | null; limit: number }[];
+}
+
+/** Tokens of a question, a model, an agent or a period. Total = input + output (cached is part of input, reasoning of output). */
+export interface Tokens {
+  input: number;
+  output: number;
+  cached: number;
+  reasoning: number;
+  total: number;
 }
 
 /** A question someone asked an agent, as a card (`GET /api/queries`). */
@@ -174,7 +212,11 @@ export interface QueryCard {
   tools: string[];
   model_calls: number;
   tool_calls: number;
-  exchanges: number;
+  /** Steps = human messages + AI messages (model replies and tool uses). */
+  steps: number;
+  human_messages: number;
+  ai_messages: number;
+  tokens: Tokens;
   status: "ok" | "problem";
   problem: string;
   user_id: string | null;
@@ -186,6 +228,10 @@ export interface QueryCard {
 /** One message of a question's thread. */
 export interface ThreadItem {
   kind: "question" | "model" | "answer" | "tool";
+  /** Who said it: you (human) or the AI side (model replies and tools). */
+  side: "human" | "ai";
+  /** Model steps: exact counts. Your question and tool results: estimated from their length (exact = false). */
+  tokens: { input: number; output: number; cached?: number; reasoning?: number; exact: boolean };
   text?: string;
   step?: number;
   model?: string;
@@ -214,6 +260,7 @@ export interface QueryThread extends QueryCard {
 }
 
 /** The peaks chart: one point per question, or time slots when there are many. */
+/** The steps chart: one point per question, or time slots when there are many. */
 export interface QueryTimeline {
   mode: "questions" | "slots";
   window_hours?: number;
@@ -222,12 +269,17 @@ export interface QueryTimeline {
     start_ns: number;
     end_ns?: number;
     question: string;
-    exchanges: number;
-    model_calls?: number;
-    tool_calls?: number;
-    cost_usd?: number | null;
-    duration_ms?: number;
-    status?: string;
+    steps: number;
+    human_messages: number;
+    ai_messages: number;
+    model_calls: number;
+    tool_calls: number;
+    tokens: Tokens;
+    cost_usd: number | null;
+    duration_ms: number;
+    models?: string[];
+    tools?: string[];
+    status: string;
     count?: number;
     questions?: string[];
   }[];
@@ -242,8 +294,10 @@ export interface AgentEntry {
   models: string[];
   tools: string[];
   usd: number;
-  exchanges: number;
-  avg_exchanges: number;
+  steps: number;
+  avg_steps: number;
+  tokens: Tokens;
+  avg_tokens: number;
   problems: number;
   first_ns: number;
   last_ns: number;
@@ -259,6 +313,8 @@ export interface GraphNode {
   avg_ms: number | null;
   errors: number;
   cost_usd: number;
+  /** Model nodes: the tokens it read and wrote. */
+  tokens: number;
   traces: string[];
 }
 
@@ -321,6 +377,13 @@ export interface McpServer {
 export interface Overview {
   /** Questions asked in the window (agent runs with a model call). */
   discussions: number;
+  /** Steps of those questions, split into your messages and the AI's. */
+  steps_total: number;
+  human_messages: number;
+  ai_messages: number;
+  problem_questions: number;
+  heavy_questions: number;
+  tokens: Tokens & { change: number | null; budget: TokenBudget };
   /** MCP servers, and the distinct tools they offer. */
   mcps: number;
   tools_total: number;
@@ -572,6 +635,7 @@ export interface Spending {
   enabled: boolean;
   totals: CostTotals;
   by_model: { provider: string; model: string; usd: number; calls: number; prompt_tokens: number; completion_tokens: number;
+              cached_tokens: number; reasoning_tokens: number;
               status: string; confidence: string; note: string; source: string }[];
   by_tool: { tool: string; usd: number; calls: number }[];
   series: { start_ns: number; usd: number; by_model: Record<string, number> }[];

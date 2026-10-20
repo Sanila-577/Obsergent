@@ -1,7 +1,7 @@
 // Thin typed wrappers around the Obsergent REST API. Every page talks to the server only through here.
 // Only types (the shapes of API data); nothing is loaded at run time.
 import type {
-  AgentEntry, AgentGraph, McpServer, ModelEntry, QueryCard, QueryThread, QueryTimeline,
+  AgentEntry, AgentGraph, McpServer, Usage, ModelEntry, QueryCard, QueryThread, QueryTimeline,
   Conversation, Finding, GatewayCall, GatewaySummary, Generations, Overview, PolicySuggestion, RunDiff,
   ServerInfo, Session, SnapshotsResponse, TimelineEvent, ToolListDiff, ToolStats, Topology, TraceDetail, TraceFilters,
   TraceSummary, Span, Spending, PriceStatus,
@@ -53,7 +53,8 @@ export const api = {
   generations: (id: string) => request<Generations>(`/api/traces/${id}/generations`),
   diff: (a: string, b: string) => request<RunDiff>("/api/diff", { a, b }),
   tools: (hours: number) => request<ToolStats[]>("/api/tools", { hours }),
-  models: () => request<ModelEntry[]>("/api/models"),
+  models: (hours?: number) => request<ModelEntry[]>("/api/models", { hours }),
+  usage: (hours: number) => request<Usage>("/api/usage", { hours, buckets: hours <= 6 ? 12 : 24 }),
   topology: (hours: number, expand = "") => request<Topology>("/api/topology", { hours, expand }),
   queries: (params: { hours?: number; limit?: number; q?: string; before_ns?: number; since?: number; until?: number } = {}) => request<QueryCard[]>("/api/queries", params),
   query: (id: string) => request<QueryThread>(`/api/queries/${id}`),

@@ -39,12 +39,15 @@ class GraphBuilder:
     def node(self, node_id: str, kind: str, label: str, span: Span | None = None, trace_id: str = "") -> None:
         """Count one more use of a node (and the time and failure of the span that used it)."""
         entry = self.nodes.setdefault(node_id, {"id": node_id, "kind": kind, "label": label, "calls": 0, "total_ms": 0.0,
-                                                "errors": 0, "cost_usd": 0.0, "traces": []})
+                                                "errors": 0, "cost_usd": 0.0, "tokens": 0, "traces": []})
         if span is not None:
             entry["calls"] += 1
             entry["total_ms"] += span.duration_ms
             entry["errors"] += span.status_code == "ERROR"
             entry["cost_usd"] += self.costs.get(span.span_id, 0.0)
+            if kind == "model":  # the tokens this model read and wrote
+                entry["tokens"] += int(span.attributes.get("llm.token_count.prompt") or 0) + int(
+                    span.attributes.get("llm.token_count.completion") or 0)
         if trace_id and trace_id not in entry["traces"] and len(entry["traces"]) < 20:
             entry["traces"].append(trace_id)
 

@@ -15,6 +15,10 @@ import { PAGES } from "../lib/words";
 
 type Tab = "tools" | "changes";
 type Filter = "all" | "used" | "unused";
+type ToolSort = "name" | "used" | "slow";
+const TOOL_SORTS: Record<ToolSort, (a: McpTool, b: McpTool) => number> = {
+  name: (a, b) => a.name.localeCompare(b.name), used: (a, b) => b.calls - a.calls, slow: (a, b) => (b.p95_ms ?? -1) - (a.p95_ms ?? -1),
+};
 
 function ServerCard({ server, selected, onPick }: { server: McpServer; selected: boolean; onPick: () => void }) {
   return (
@@ -42,7 +46,7 @@ function ToolCard({ tool, selected, onPick }: { tool: McpTool; selected: boolean
           <span className={`badge ${tool.used ? "ok" : "neutral"}`}>{tool.used ? "used" : "not used yet"}</span></span></span>
       <span className="gcard-desc">{tool.description || "No description."}</span>
       <span className="row wrap" style={{ gap: 4 }}>{tool.parameters.length ? tool.parameters.map((p) => <span key={p.name} className="badge outline mono">{p.name}{p.required ? "*" : ""}</span>) : <span className="muted" style={{ fontSize: 12 }}>no inputs</span>}</span>
-      <span className="gcard-stats"><span><b>{tool.calls}</b> calls</span><span><b>{formatMs(tool.p50_ms)}</b> typical</span><span>{tool.last_used_ns ? timeAgo(tool.last_used_ns) : "never used"}</span></span>
+      <span className="gcard-stats"><span><b>{tool.calls}</b> calls</span><span><b>{formatMs(tool.p50_ms)}</b> typical</span><span><b>{formatMs(tool.p95_ms)}</b> slowest</span></span>
     </button>
   );
 }
@@ -87,6 +91,7 @@ export function Mcps() {
   const servers = useQuery({ queryKey: ["mcps"], queryFn: api.mcps });
   const [filter, setFilter] = useState<Filter>("all");
   const [text, setText] = useState("");
+  const toolSort = (params.get("sort") as ToolSort) || "name";
   const tab = (params.get("tab") as Tab) || "tools";
   const setParam = (changes: Record<string, string | null>) => { const next = new URLSearchParams(params); for (const [k, v] of Object.entries(changes)) { if (v) next.set(k, v); else next.delete(k); } setParams(next, { replace: true }); };
 
@@ -98,13 +103,13 @@ export function Mcps() {
 
   return (
     <>
-      <PageHead title={PAGES.mcps.title} about={PAGES.mcps.about} sub={servers.data ? `${servers.data.length} MCP server${servers.data.length === 1 ? "" : "s"}` : undefined}>
+      <PageHead title={PAGES.mcps.title} about={PAGES.mcps.about} help={PAGES.mcps.help} sub={servers.data ? `${servers.data.length} MCP server${servers.data.length === 1 ? "" : "s"}` : undefined}>
         <Help topic="mcp" />
       </PageHead>
       <QueryState query={servers} empty={{ when: (s) => s.length === 0, title: "No MCP server seen yet", hint: <FirstRun kind="servers" title="No MCP server seen yet" /> }}>
         {(list) => {
           const tools = (current?.tools ?? []).filter((t) => (filter === "all" || (filter === "used") === t.used)
-            && `${t.name} ${t.description}`.toLowerCase().includes(text.trim().toLowerCase()));
+            && `${t.name} ${t.description}`.toLowerCase().includes(text.trim().toLowerCase())).sort(TOOL_SORTS[toolSort]);
           const selectedTool = current?.tools.find((t) => t.name === params.get("tool")) ?? null;
           return (
             <div className="col" style={{ gap: 16 }}>
@@ -120,6 +125,7 @@ export function Mcps() {
                       <div className="row wrap">
                         <label className="searchbox"><Search size={14} /><input type="search" placeholder="Search tools" value={text} onChange={(e) => setText(e.target.value)} aria-label="Search tools" /></label>
                         <Segmented<Filter> value={filter} onChange={setFilter} options={[{ id: "all", label: "All" }, { id: "used", label: "Used" }, { id: "unused", label: "Not used yet" }]} />
+                        <Segmented<ToolSort> value={toolSort} onChange={(next) => setParam({ sort: next === "name" ? null : next })} options={[{ id: "name", label: "A–Z" }, { id: "used", label: "Most used" }, { id: "slow", label: "Slowest" }]} />
                         {current.command && <span className="muted mono truncate" style={{ maxWidth: 420 }} title={current.command}>{current.command}</span>}
                       </div>
                       {tools.length === 0 ? <EmptyState title="No tool matches" /> : <div className="gcards tools" role="list" aria-label={`Tools of ${current.name}`}>
