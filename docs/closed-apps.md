@@ -1,15 +1,10 @@
 # Recording Claude Desktop, Cursor and other apps you can't modify
 
 Apps like Claude Desktop talk to MCP servers, but you can't add Obsergent's SDK to them. Instead you change **one entry
-in the app's config** so that it starts `obsergent proxy` instead of the server. The proxy starts the real server itself
+in the app's config** so that it starts Obsergent's proxy instead of the server. The proxy starts the real server itself
 and records every request (tool, arguments, result, timing), with **no code changes**.
 
-```
-Claude Desktop  ──►  obsergent proxy  ──►  your MCP server
-                          │ spans
-                          ▼
-                 obsergent up  (server + web UI)  →  SQLite
-```
+![Claude Desktop starts the Obsergent proxy, which starts your MCP server and sends what it records to the Obsergent server, stored in SQLite](diagrams/closed-apps.png)
 
 What you will see: every MCP call Claude made, grouped into a **session** (one session = one proxy process = one
 Claude Desktop connection to that server). Each call is its own run, because Claude sends no trace id. You will **not** see
@@ -21,19 +16,22 @@ Claude's own conversation: that never leaves the app.
 
 ```bash
 cd /path/to/Obsergent
-source .venv/bin/activate          # skip if an environment is already active (create it once: uv venv, then uv pip install -e ".[dev,langchain,examples,grpc]")
 make up                            # leave this terminal open: http://127.0.0.1:7318 (server.port in config.yaml)
 ```
 
-> **Order matters.** The proxy sends what it records to `obsergent up`. If the server is not running while you use
+(The environment comes from the README's [Prerequisites](../README.md#1-prerequisites); `make` finds `.venv` by itself.)
+
+> **Order matters.** The proxy sends what it records to the Obsergent server. If the server is not running while you use
 > Claude, the calls still work, but **nothing is recorded** (Claude Desktop's log then shows
-> `Max retries exceeded ... 127.0.0.1:7318`). Start `obsergent up`, then use Claude.
+> `Max retries exceeded ... 127.0.0.1:7318`). Run `make up` first, then use Claude.
 
 ### 2. Edit Claude Desktop's config
 
 Claude Desktop → **Settings → Developer → Edit Config** (the file is
 `~/Library/Application Support/Claude/claude_desktop_config.json`). Add an `mcpServers` entry at the top level of the JSON.
-Use **absolute paths**: the app does not see your shell's `PATH` or virtual environment. Replace the path prefix with yours:
+Use **absolute paths**: the app does not see your shell's `PATH` or virtual environment. Replace the path prefix with yours.
+This is the one place where the `obsergent` program is named directly: Claude Desktop starts it itself (`make` is only for
+you in a terminal).
 
 ```json
 {
@@ -50,12 +48,8 @@ Use **absolute paths**: the app does not see your shell's `PATH` or virtual envi
 }
 ```
 
-The pattern is always: `command` = the `obsergent` program, `args` = `proxy --name <a label> -- <the real server's command and arguments>`. If the file already has other settings, keep them: `"mcpServers"` is just one more key, and
-**mind the commas** (a missing comma makes the whole file invalid and the app ignores it).
-
-To find your paths: `echo "$(pwd)/.venv/bin/obsergent"` from the repository root.
-
-A second, third... server is just another entry, e.g. the filesystem server (use the absolute path of `npx`: `which npx`):
+**Optional:** this is only needed if you want Claude to use more than one server; the bookshop entry above is enough. Each
+extra server is one more entry, e.g. the filesystem server (use the absolute path of `npx`: `which npx`):
 
 ```json
 "filesystem": {
@@ -79,22 +73,19 @@ first one."* Approve the tool use if Claude asks.
 
 Open **http://127.0.0.1:7318**:
 
-* **Sessions** → the newest one (server `bookshop`) → the **session timeline**: every request in order, with arguments and results.
-* **Runs** → each call is a run; open one for its timeline, and use *Copy as curl* to repeat the call.
-* **Servers & tools** → `bookshop`: how often each tool was used, and the version history of its tool list.
-* **Findings** → anything suspicious (a tool whose description changed, risky tool names, injection-like text).
+* **App activity** → the newest session (server `bookshop`): every request in order, with arguments and results.
+* **All activity** (switch to **Detailed** at the top) → each call is a run; open one for its timeline, and use *Copy as curl*
+  to repeat the call.
+* **MCPs** → `bookshop`: its tools, how often each was used, and (tab **Changes**) the version history of its tool list.
+* **Things to check** → anything suspicious (a tool whose description changed, risky tool names, injection-like text).
 
-The same in the terminal: `obsergent sessions`, `obsergent traces`, `obsergent show <id>`.
+The same in the terminal, from the repository root:
 
-## If it does not work
-
-| Symptom                                                                | What to check                                                                                                                                                                                                                                                                                                                                                                 |
-| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bookshop` is not listed, or shows an error in Settings → Developer | The config JSON must be valid (commas!). Run the exact `command` + `args` in a terminal: it should wait silently (it is waiting for a client). Fix any path error.                                                                                                                                                                                                        |
-| `bookshop` runs but nothing appears in Obsergent                    | Was `obsergent up` running **before** you used Claude (step 1)? Same database and port? The proxy reads the repository's `config.yaml` (`server.port`, `storage.path`); if you moved the repository or use another config, add `"env": {"OBSERGENT_CONFIG": "/abs/path/config.yaml"}` (or `"OBSERGENT_ENDPOINT": "http://127.0.0.1:PORT"`) to the entry. |
-| It stopped working after you restarted `obsergent up`               | The proxy keeps running inside Claude Desktop, so recording resumes by itself; if the server was down during a call, that call was not recorded.                                                                                                                                                                                                                              |
-| `bookshop` shows as disconnected                                     | Something stopped the proxy process (for example `pkill -f obsergent`). Quit and reopen Claude Desktop.                                                                                                                                                                                                                                                                    |
-| Claude says it cannot find the tool                                    | Quit and reopen Claude Desktop after every config change.                                                                                                                                                                                                                                                                                                                     |
+```bash
+make sessions                # one line per proxy session (what Claude Desktop did with each server)
+make traces                  # the recorded runs, newest first
+make show ID=<run id>        # one run as a tree (the first characters of an id from make traces are enough)
+```
 
 Claude Desktop's own log for the server is `~/Library/Logs/Claude/mcp-server-bookshop.log` (named after the config key);
 the proxy's messages (`obsergent proxy: recording 'bookshop' ...`) and any export errors appear there.
@@ -104,16 +95,14 @@ the proxy's messages (`obsergent proxy: recording 'bookshop' ...`) and any expor
 * **Cursor**: the same JSON in `~/.cursor/mcp.json`.
 * **MCP Inspector** (`npx @modelcontextprotocol/inspector`): choose transport **STDIO**, command = the `obsergent`
   absolute path, arguments = `proxy --name bookshop -- /abs/path/python /abs/path/bookshop_server.py`.
+* **Remote servers (Streamable HTTP) and gateways**: for a server reachable by URL, run the HTTP proxy and give the app the
+  proxy's URL instead:
 
-## Remote servers (Streamable HTTP) and gateways
-
-For a server reachable by URL, run the HTTP proxy and give the app the proxy's URL instead:
-
-```bash
-obsergent proxy-http --name github --url https://example.com/mcp
-# the app now uses  http://127.0.0.1:7319/mcp/github      (the port is proxy.port in config.yaml; --port overrides it)
-```
+  ```bash
+  make proxy NAME=github URL=https://example.com/mcp
+  # the app now uses  http://127.0.0.1:7319/mcp/github      (the port is proxy.port in config.yaml)
+  ```
 
 The `Authorization` header is forwarded to the real server but never recorded. For a WSO2 API Platform gateway see
 [wso2-integration.md](wso2-integration.md). Whether a given app accepts a plain `http://127.0.0.1` MCP URL depends on the
-app; stdio servers through `obsergent proxy` work everywhere.
+app; stdio servers through the proxy (step 2) work everywhere.

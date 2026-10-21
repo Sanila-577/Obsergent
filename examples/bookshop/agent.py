@@ -1,8 +1,8 @@
 """A LangGraph + Ollama agent traced by Obsergent (SDK + proxy).
 
-    obsergent up                 # in another terminal: starts the server
+    make up                      # in another terminal, from the repository root: starts the server
     python agent.py "Do you have a Python book in stock?"
-    obsergent traces
+    make traces                  # from the repository root
     # the model comes from .env (copy .env.example): Ollama, OpenAI, Anthropic, Groq, OpenRouter, Hugging Face, ...
 
 Two recorders feed the Obsergent server:

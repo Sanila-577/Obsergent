@@ -1,20 +1,24 @@
 # Obsergent: the commands you run FROM THIS REPOSITORY, in one place.   `make help` lists them.
 #
 # The WSO2 gateway is a separate repository (github.com/wso2/api-platform): its commands (git clone, setup.sh,
-# docker compose) are typed inside that repository, see README section 4. Nothing here touches it.
+# docker compose) are typed inside that repository, see the README ("Use it with the WSO2 API Platform MCP gateway").
+# Nothing here touches it.
 #
 # Settings (ports, database file, gateway addresses) are in config.yaml.
 #
 # Python: uses the virtual environment that is already active; if none is, it uses ./.venv (create it with `make install`,
-# which runs `uv venv` and `uv pip install -e ".[...]"`). No need to activate again.
+# which runs `uv venv` and `uv pip install -r requirements.txt`). No need to activate again.
 SHELL := /bin/bash
 
 # ----------------------------------------------------------------------------------------------------------- settings
 VENV_BIN          := $(if $(VIRTUAL_ENV),$(VIRTUAL_ENV)/bin,.venv/bin)
-EXTRAS            ?= dev,langchain,examples,grpc
+# For `make proxy` / `make proxy-bg`: record any remote MCP server (default: the WSO2 gateway of config.yaml).
+NAME              ?=
+URL               ?=
+PROXY_ARGS        := $(if $(NAME),--name $(NAME)) $(if $(URL),--url $(URL))
 
 # Ports, addresses and the database file are NOT set here: they live in config.yaml (read by src/obsergent/config.py).
-# `obsergent config` prints what is in use, e.g. `obsergent config server.port`.
+# `make config` prints what is in use.
 
 .DEFAULT_GOAL := help
 
@@ -24,14 +28,16 @@ help:  ## show this list
 	@awk 'BEGIN{FS=":.*## "} /^##@/{printf "\n%s\n", substr($$0,5)} /^[a-zA-Z0-9_-]+:.*## /{printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 ##@ Install and build (once)
-.PHONY: install ui-install ui-build env setup
-install:  ## uv venv (if no environment is active or present) + uv pip install -e ".[EXTRAS]"
+.PHONY: install ui-install ui-build env setup diagrams
+install:  ## uv venv (if no environment is active or present) + uv pip install -r requirements.txt
 	@if [ -z "$$VIRTUAL_ENV" ] && [ ! -d .venv ]; then uv venv; fi
-	uv pip install -e ".[$(EXTRAS)]"
+	uv pip install -r requirements.txt
 ui-install:  ## UI dependencies (needs Node.js 20+)
 	cd ui && npm install
 ui-build:  ## build the web UI into src/obsergent/server/static/
 	cd ui && npm run build
+diagrams:  ## redraw the diagrams in docs/diagrams/ (needs `make ui-install` once)
+	cd ui && node scripts/make-diagrams.mjs
 env:  ## create .env (language model settings) from .env.example if it does not exist
 	test -f .env || cp .env.example .env
 	@echo ".env is ready: edit the LLM_* lines to choose the model (Ollama by default)"
@@ -40,7 +46,7 @@ setup: install ui-install ui-build env  ## all of the above
 ##@ Run Obsergent
 .PHONY: up up-grpc free-ports
 # free-ports: stop whatever listens on the ports Obsergent is about to use (server.port, and server.grpc_port), for
-# example an `obsergent up` you started earlier. The ports come from config.yaml.
+# example a `make up` you started earlier. The ports come from config.yaml.
 define kill_port
 pids=$$(lsof -ti tcp:$(1) -sTCP:LISTEN 2>/dev/null); if [ -n "$$pids" ]; then echo "port $(1) is in use: stopping $$pids"; kill $$pids; sleep 1; fi
 endef
@@ -55,7 +61,7 @@ up-grpc:  ## same, plus the gRPC receiver on :4317 (first stops anything on eith
 	$(VENV_BIN)/obsergent up --grpc
 
 ##@ Look at what was recorded (terminal; the web UI shows the same)
-.PHONY: traces show sessions drift config prices prices-status usage
+.PHONY: traces show sessions drift config prices prices-status usage price
 traces:  ## list the recorded runs, newest first (LIMIT=N for more, default 20)
 	$(VENV_BIN)/obsergent traces --limit $(or $(LIMIT),20)
 show:  ## one run as a span tree: make show ID=<first characters of a run id from `make traces`>
@@ -69,12 +75,15 @@ prices:  ## download the model price lists now (they also refresh by themselves 
 	$(VENV_BIN)/obsergent prices refresh
 usage:  ## tokens used in the last 24 hours: totals, by model, heaviest questions, daily budget (HOURS=168 for a week)
 	$(VENV_BIN)/obsergent usage --hours $(or $(HOURS),24)
+price:  ## the price used for one model: make price MODEL=gpt-4o-mini [PROVIDER=openai]
+	@test -n "$(MODEL)" || { echo "usage: make price MODEL=<model name> [PROVIDER=<provider>]"; exit 1; }
+	$(VENV_BIN)/obsergent prices show $(MODEL) $(if $(PROVIDER),--provider $(PROVIDER))
 prices-status:  ## when the price lists were last downloaded
 	$(VENV_BIN)/obsergent prices status
 config:  ## the settings in use (config.yaml + environment)
 	$(VENV_BIN)/obsergent config
 
-##@ With a WSO2 gateway (it must be running: README section 4)
+##@ With a WSO2 gateway (it must be running, see the README) or any remote MCP server
 .PHONY: mcp-http register register-deny proxy traffic
 mcp-http:  ## the Bookshop MCP server over HTTP on :9100 (the gateway in Docker reaches it as host.docker.internal)
 	$(VENV_BIN)/python examples/bookshop/bookshop_http.py --host 0.0.0.0
@@ -82,8 +91,8 @@ register:  ## register it in the gateway (needs WSO2AP_GW_PASSWORD in the enviro
 	$(VENV_BIN)/python scripts/wso2_gateway.py register
 register-deny:  ## same, plus the mcp-acl-list policy: only search_books is allowed
 	$(VENV_BIN)/python scripts/wso2_gateway.py register --deny-price
-proxy:  ## Obsergent's recording proxy in front of the gateway (clients use http://127.0.0.1:7319/mcp/wso2)
-	$(VENV_BIN)/obsergent proxy-http
+proxy:  ## the recording proxy in front of the gateway (http://127.0.0.1:7319/mcp/wso2); other servers: NAME=x URL=https://…/mcp
+	$(VENV_BIN)/obsergent proxy-http $(PROXY_ARGS)
 traffic:  ## plain MCP test calls through the proxy (no agent, no model)
 	$(VENV_BIN)/python scripts/wso2_gateway.py traffic
 
@@ -110,7 +119,7 @@ mcp-http-bg:  ## the Bookshop MCP server over HTTP, detached (log: .run/mcp-http
 	@$(call wait_for,MCP server,http://127.0.0.1:$$($(VENV_BIN)/obsergent config bookshop.http_port)/mcp)
 proxy-bg:  ## Obsergent's recording proxy in front of the gateway, detached (log: .run/proxy.log)
 	@$(call kill_port,$$($(VENV_BIN)/obsergent config proxy.port))
-	@$(call spawn,proxy,$(VENV_BIN)/obsergent proxy-http)
+	@$(call spawn,proxy,$(VENV_BIN)/obsergent proxy-http $(PROXY_ARGS))
 	@$(call wait_for,Proxy,http://127.0.0.1:$$($(VENV_BIN)/obsergent config proxy.port)/mcp/x)
 start: up-grpc-bg mcp-http-bg  ## server+gRPC, MCP server, registration in the gateway, proxy: all detached (gateway: docker compose, see README)
 	@if [ -n "$$WSO2AP_GW_PASSWORD" ]; then $(MAKE) --no-print-directory register; else echo "skipped register: export WSO2AP_GW_PASSWORD first, then run: make register"; fi

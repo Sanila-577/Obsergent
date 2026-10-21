@@ -1,9 +1,9 @@
 # Obsergent settings: every port, address and path in one place.
 #
 # Read by src/obsergent/config.py (functions such as config.port(), config.db_path()), by the Makefile
-# (through `obsergent config <key>`) and by the scripts. To change a value, edit it here.
+# (through `make config`) and by the scripts. To change a value, edit it here.
 # An environment variable with the name shown in [brackets] overrides the value for one run, for example
-#       OBSERGENT_PORT=7390 obsergent up
+#       OBSERGENT_PORT=7390 make up
 # Secrets are NOT stored here: the model's API keys go in .env, the gateway password in WSO2AP_GW_PASSWORD.
 #
 # Another file can be used with OBSERGENT_CONFIG=/path/to/config.yaml
@@ -12,7 +12,7 @@
 server:
   host: 127.0.0.1        # [OBSERGENT_HOST] 127.0.0.1 = this machine only (nothing is exposed to the network)
   port: 7318             # [OBSERGENT_PORT] web UI, REST API and OTLP/HTTP (POST /v1/traces)
-  grpc_port: 4317        # [OBSERGENT_GRPC_PORT] OTLP/gRPC, used by `obsergent up --grpc` (the WSO2 gateway sends here)
+  grpc_port: 4317        # [OBSERGENT_GRPC_PORT] OTLP/gRPC, used by `make up-grpc` (the WSO2 gateway sends here)
   endpoint: ""           # [OBSERGENT_ENDPOINT] where SDKs and proxies SEND spans; empty = http://<host>:<port>
 
 # Where everything recorded is stored (one SQLite file). ~ means your home folder.
@@ -23,7 +23,7 @@ storage:
 recording:
   max_attr_chars: 4000   # [OBSERGENT_MAX_ATTR_CHARS] longer arguments / results are cut to this many characters
 
-# `obsergent proxy-http`: the recording proxy in front of a remote MCP server or a gateway.
+# `make proxy`: the recording proxy in front of a remote MCP server or a gateway.
 proxy:
   host: 127.0.0.1
   port: 7319             # [OBSERGENT_PROXY_PORT]

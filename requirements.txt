@@ -1,5 +1,10 @@
 # Tested together on Python 3.13 (October 2026).
-# Active lines cover Examples 1-6. Uncomment the rest as you reach each example.
+#     uv pip install -r requirements.txt
+
+# --- Obsergent itself (this folder, editable), the example agent, the tests and the gRPC receiver ---
+-e .[dev,langchain,examples,grpc]
+
+# --- The tutorial examples (tutorial/). Active lines cover Examples 1-6. Uncomment the rest as you reach each example. ---
 
 # --- Example 1 ---
 opentelemetry-api==1.45.1

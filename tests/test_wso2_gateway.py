@@ -1,6 +1,6 @@
 """WSO2 API Manager MCP gateway support: who called, what the gateway decided, gateway telemetry.
 
-The shapes used here were captured from a REAL APIM 4.7 gateway (see docs/wso2-findings.md):
+The shapes used here were captured from a REAL APIM 4.7 gateway:
 401 bodies (codes 900901/900902), the 403 for a missing tool scope (900910), the `activityid`
 response header, the JWT claims, and the gateway's own OpenTelemetry spans (tests/fixtures/apim_gateway.json).
 """
