@@ -44,8 +44,10 @@ button:hover:not(:disabled), .btn:hover { border-color: var(--accent); }
   .nav-group { flex-direction: row; margin: 0; }
   .nav-link { white-space: nowrap; }
   .content { padding: 14px; }
-  .topbar { flex-wrap: wrap; padding: 8px 12px; gap: 8px; }
+  .topbar { flex-wrap: wrap; padding: 8px 12px; gap: 6px; }
   .topbar .grow { display: none; }
+  .topbar .seg button { padding: 5px 8px; font-size: 13px; }
+  .wide-only { display: none; }
 }
 
 /* no blur available: solid panels with the same borders */

@@ -10,7 +10,7 @@ import { Help } from "../components/Help";
 import { ToolChanges } from "../components/ToolChanges";
 import { Card, DecisionBadge, EmptyState, PageHead, QueryState, Segmented, Tabs } from "../components/ui";
 import { formatMs, timeAgo } from "../lib/format";
-import { useSettings } from "../lib/state";
+import { useLiveInterval, useSettings } from "../lib/state";
 import { PAGES } from "../lib/words";
 
 type Tab = "tools" | "changes";
@@ -88,7 +88,7 @@ function ToolDetail({ tool, server }: { tool: McpTool; server: McpServer }) {
 
 export function Mcps() {
   const [params, setParams] = useSearchParams();
-  const servers = useQuery({ queryKey: ["mcps"], queryFn: api.mcps });
+  const servers = useQuery({ queryKey: ["mcps"], queryFn: api.mcps, refetchInterval: useLiveInterval() });
   const [filter, setFilter] = useState<Filter>("all");
   const [text, setText] = useState("");
   const toolSort = (params.get("sort") as ToolSort) || "name";

@@ -10,7 +10,7 @@ import { Help } from "../components/Help";
 import { Card, PageHead, QueryState, Segmented, Skeleton } from "../components/ui";
 import { formatCount, formatMoney, formatMs, formatPercent, formatTime, formatTokens, timeAgo } from "../lib/format";
 import { perMillion } from "../lib/models";
-import { useSettings } from "../lib/state";
+import { useLiveInterval, useSettings } from "../lib/state";
 import { PAGES } from "../lib/words";
 
 // The charts load after the first paint.
@@ -130,7 +130,7 @@ function Detail({ model }: { model: ModelEntry }) {
 export function Models() {
   const [params, setParams] = useSearchParams();
   const { hours } = useSettings();
-  const models = useQuery({ queryKey: ["models", hours], queryFn: () => api.models(hours) });
+  const models = useQuery({ queryKey: ["models", hours], queryFn: () => api.models(hours), refetchInterval: useLiveInterval() });
   const [sort, setSort] = useState<Sort>("calls");
   const [compare, setCompare] = useState(false);
   const provider = params.get("provider") ?? "";

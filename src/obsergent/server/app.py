@@ -606,29 +606,34 @@ def create_app(storage: Backend | None = None) -> FastAPI:
         usage = Counter(c["tool"] for c in store.list_calls() if c["server"] == server)
         return suggest_policy(server, snapshots[-1]["tools"], dict(usage))
 
+    # Has anything new been stored? The UI asks every second and reloads its data only when the answer changes.
+    @app.get("/api/version")
+    def data_version():
+        return {"version": store.data_version()}
+
     # Liveness check (used by tests and the start-up scripts).
     @app.get("/health")
     def health():
         return {"status": "ok"}
 
     # ------------------------------------------------------------------ the UI
-    # Registered last: anything that is not an API route and not a real file gets the UI's index.html, so
-    # client-side routes (/runs/abc, /gateway...) survive a page reload.
-    if (STATIC_DIR / "index.html").exists():
-        if (STATIC_DIR / "assets").exists():
-            # Serve the built JS/CSS files at /assets.
-            app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+    # Registered last: anything that is not an API route gets the built UI's file or its index.html, so client-side routes
+    # (/conversations, /gateway...) survive a page reload. The folder is checked on every request, not only at start-up, so a UI
+    # built (or rebuilt) while the server runs is served at once.
+    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets", check_dir=False), name="assets")
 
-        # Catch-all route for UI pages.
-        @app.get("/{path:path}", include_in_schema=False)
-        # Return a real file if it exists, else index.html.
-        def serve_ui(path: str):
-            if path.startswith(NOT_API):
-                raise HTTPException(404, "not found")
-            candidate = (STATIC_DIR / path).resolve()
-            if path and candidate.is_file() and candidate.is_relative_to(STATIC_DIR.resolve()):  # no ../ escapes
-                return FileResponse(candidate)
-            return FileResponse(STATIC_DIR / "index.html")
+    # Catch-all route for UI pages.
+    @app.get("/{path:path}", include_in_schema=False)
+    # Return a real file if it exists, else index.html (or a hint when the UI has not been built).
+    def serve_ui(path: str):
+        if path.startswith(NOT_API):
+            raise HTTPException(404, "not found")
+        if not (STATIC_DIR / "index.html").exists():
+            raise HTTPException(404, "The web UI is not built yet: run `make ui-build` (the API works without it).")
+        candidate = (STATIC_DIR / path).resolve()
+        if path and candidate.is_file() and candidate.is_relative_to(STATIC_DIR.resolve()):  # no ../ escapes
+            return FileResponse(candidate)
+        return FileResponse(STATIC_DIR / "index.html")
 
     # Hand the finished app to the caller (uvicorn).
     return app

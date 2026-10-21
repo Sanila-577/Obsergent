@@ -274,6 +274,10 @@ or motion, and text contrast of at least 4.5:1 in both themes (a browser test ch
 keep their header to one short line (the rest is behind the (?)); every number and chart point opens what is behind it; a
 three-step tour runs on the first visit; `?` shows all shortcuts.
 
+**Real time:** recorders send what they record every second, and the UI asks the server every second whether anything new
+arrived and then reloads at once, so a question appears on every page while the agent is still finishing (no Live mode needed;
+Live also re-reads every 2 seconds). Every page fits phones from 320 px wide (graphs run top to bottom there).
+
 Shortcuts: `⌘K` / `Ctrl+K` search · `g` then `o c a m d s f n r` go to Overview, Conversations, Agents, MCPs, Models, Usage &
 cost, Things to check, Connections, All activity · `←` `→` previous / next question or chart point · `Enter` open it · `j` / `k`
 move through a timeline · `?` the shortcut sheet. Also: live updates (refresh every 2 s, with a "new question" pill), last hour /
@@ -281,8 +285,10 @@ today / 7 days, dark and light theme.
 
 ## Monitoring tokens
 
-Tokens are the pieces of text a model reads (**in**) and writes (**out**); providers bill by them. Every model call records them
-exactly, so Obsergent shows them everywhere a model appears:
+Tokens are the pieces of text a model reads (**tokens in**: instructions, your question, the chat so far, tool results and tool
+descriptions) and writes (**tokens out**: answers and tool requests); providers bill by them. They are counted by the model provider
+and recorded from its response by `obsergent.sdk.init()`; the whole procedure, with a real Ollama example, is in
+[docs/costs.md](docs/costs.md#tokens-what-they-are-and-how-obsergent-collects-them). Obsergent shows them everywhere a model appears:
 
 * **Overview:** the Tokens tile (with the change from the period before) and the tokens of each question when you hover the chart.
 * **Conversations:** the tokens of each step. Model replies are exact; your message and tool results are marked "≈" because
@@ -405,6 +411,7 @@ Attribute names follow OpenTelemetry (`mcp.method.name`, `gen_ai.tool.name`...).
 | `GET /api/gateway/summary` · `/api/gateway/calls/{activity_id}` · `/api/policy/suggestion?server=` | the gateway view, one call, the policy suggestion                                                          |
 | `GET /api/spending` · `/api/prices` · `POST /api/prices/refresh`                                   | cost by model, tool and over time; the price lists' status; check prices now                               |
 | `GET /api/usage?hours=&buckets=`                                                                         | tokens: totals, over time by model, by model/agent/tool/question, overhead, near the limit, budget, heavy  |
+| `GET /api/version`                                                                                       | changes whenever something new is stored (the UI polls it every second to update at once)                 |
 | `GET /health`                                                                                            | liveness                                                                                                   |
 
 `obsergent proxy-http` (port `proxy.port`, default 7319) serves `POST|GET|DELETE /mcp/{name}`.

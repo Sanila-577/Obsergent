@@ -179,3 +179,22 @@ def test_without_a_built_ui_the_api_still_works(tmp_path, monkeypatch, storage):
     monkeypatch.setattr(app_module, "STATIC_DIR", tmp_path / "not-built")  # no index.html in there
     client = TestClient(create_app(storage))
     assert client.get("/").status_code == 404 and client.get("/health").status_code == 200
+
+
+def test_a_ui_built_after_the_server_started_is_served(tmp_path, monkeypatch):
+    monkeypatch.setattr(app_module, "STATIC_DIR", tmp_path / "static")
+    client = TestClient(create_app(SQLiteStorage(tmp_path / "x.db")))
+    assert client.get("/conversations").status_code == 404  # not built yet: a hint, not a crash
+    (tmp_path / "static" / "assets").mkdir(parents=True)
+    (tmp_path / "static" / "index.html").write_text("<html>obsergent</html>")
+    (tmp_path / "static" / "assets" / "app.js").write_text("console.log(1)")
+    assert "obsergent" in client.get("/conversations").text  # built while running: served at once
+    assert client.get("/assets/app.js").status_code == 200
+    assert client.get("/api/nothing").status_code == 404
+
+
+def test_the_data_version_changes_when_something_new_is_stored(client, storage):
+    before = client.get("/api/version").json()["version"]
+    assert client.get("/api/version").json()["version"] == before  # nothing new: the same answer
+    ingest_spans(load_fixture_spans("ollama_run.json"), storage)
+    assert client.get("/api/version").json()["version"] != before

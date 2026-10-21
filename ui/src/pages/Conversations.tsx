@@ -6,6 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { QueryCard, QueryThread } from "../api/types";
 import { FirstRun } from "../components/FirstRun";
+import { Help } from "../components/Help";
 import { AgentChip, ModelChip, ToolChip } from "../components/HoverCard";
 import { TotalCost } from "../components/Money";
 import { SideCounts } from "../components/Sides";
@@ -60,7 +61,7 @@ function Summary({ thread }: { thread: QueryThread }) {
     <Card title="Summary">
       <div className="summary-big">
         <div><span className="muted">Steps</span><strong>{thread.steps}</strong><SideCounts human={thread.human_messages} ai={thread.ai_messages} compact /></div>
-        <div><span className="muted">Tokens</span><strong>{formatTokens(t.total)}</strong><span className="muted">{formatTokens(t.input)} in · {formatTokens(t.output)} out</span></div>
+        <div><span className="muted">Tokens<Help topic="tokensIn" /></span><strong>{formatTokens(t.total)}</strong><span className="muted">{formatTokens(t.input)} read · {formatTokens(t.output)} written</span></div>
         <div><span className="muted">Cost</span><strong><TotalCost cost={thread.cost} /></strong><span className="muted">{formatMs(thread.duration_ms)}</span></div>
       </div>
       {t.total > 0 && <div className="token-bar" role="img" aria-label="How the tokens split">{parts.map(([label, n, colour]) => n > 0 &&

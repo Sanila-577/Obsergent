@@ -8,7 +8,7 @@ import type { Topology, TopologyNode } from "../api/types";
 import { FirstRun } from "../components/FirstRun";
 import { FlowGraph, type FlowEdgeInfo, type FlowNodeInfo } from "../components/FlowGraph";
 import { Card, PageHead, QueryState } from "../components/ui";
-import { useSettings } from "../lib/state";
+import { useLiveInterval, useSettings } from "../lib/state";
 import { PAGES } from "../lib/words";
 
 const KIND_WORDS: Record<string, string> = { client: "app or agent", gateway: "gateway", server: "MCP server", tool: "tool" };
@@ -53,7 +53,7 @@ export function MapPage() {
   const { hours } = useSettings();
   const [expand, setExpand] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const topology = useQuery({ queryKey: ["topology", hours, expand], queryFn: () => api.topology(hours, expand.join(",")), placeholderData: (previous) => previous });
+  const topology = useQuery({ queryKey: ["topology", hours, expand], queryFn: () => api.topology(hours, expand.join(",")), placeholderData: (previous) => previous, refetchInterval: useLiveInterval() });
   const parts = useMemo(() => (topology.data ? topologyParts(topology.data) : { nodes: [], edges: [] }), [topology.data]);
   const roots = useMemo(() => (topology.data?.nodes ?? []).filter((n) => n.kind === "client").map((n) => n.id), [topology.data]);
 

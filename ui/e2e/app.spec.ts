@@ -9,11 +9,11 @@ test("the spending page says what the models cost and lets you dig in", async ({
   await page.goto("/spending?view=dollars");
   await expect(page.getByRole("heading", { name: "Usage & cost" })).toBeVisible();
   await expect(page.getByText(/You spent/)).toBeVisible();
-  await expect(page.getByRole("img", { name: /Spending over time/ })).toBeVisible();
+  await expect(page.getByRole("img", { name: /a spike for each question, as high as its cost/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Where did the money go?" })).toBeVisible();
   await expect(page.locator(".share-row").filter({ hasText: "claude-sonnet-4-5" })).toContainText("$");
   await expect(page.locator(".share-row").filter({ hasText: "qwen2.5:7b" })).toContainText("free");
-  await page.getByRole("tab", { name: "By action" }).click();
+  await page.getByRole("tab", { name: "By tool" }).click();
   await expect(page.locator(".share-row").first()).toBeVisible();
   await page.getByRole("tab", { name: "By model" }).click();
   await page.getByRole("button", { name: "gpt-4o-mini", exact: true }).click(); // the legend filters the conversations to that model
@@ -463,13 +463,22 @@ test("less motion switches the animated arrows off", async ({ page }) => {
   if (await edge.count()) expect(await edge.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
 });
 
-test("the layout fits a phone: no sideways scrolling of the page", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 800 });
-  for (const path of ["/", "/conversations", "/models", "/mcps"]) {
-    await page.goto(path);
-    await expect(page.locator(".content")).toBeVisible();
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    expect(overflow, path).toBeLessThanOrEqual(1);
+test("every page fits any phone: no sideways scrolling, nothing sticking out", async ({ page }) => {
+  const pages = ["/", "/conversations", "/agents", "/mcps", "/models", "/spending", "/spending?view=dollars", "/findings", "/gateway", "/map", "/sessions", "/compare", "/about"];
+  for (const width of [320, 360, 390, 414]) {
+    await page.setViewportSize({ width, height: 800 });
+    for (const path of pages) {
+      await page.goto(path);
+      await expect(page.locator(".page-head h1")).toBeVisible();
+      const problem = await page.evaluate(() => {
+        if (document.documentElement.scrollWidth > document.documentElement.clientWidth + 1) return "the page scrolls sideways";
+        // Something wider than the screen that is not inside a box made to scroll sideways (strips, tables, charts).
+        const scrolls = (el: Element) => { for (let p = el.parentElement; p; p = p.parentElement) { const s = getComputedStyle(p); if (["auto", "scroll", "hidden"].includes(s.overflowX) && p.scrollWidth > p.clientWidth + 1) return true; } return false; };
+        const out = [...document.querySelectorAll("body *")].find((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.right > window.innerWidth + 2 && !scrolls(el); });
+        return out ? `${out.tagName.toLowerCase()}.${[...out.classList].join(".")} sticks out` : "";
+      });
+      expect(problem, `${path} at ${width}px`).toBe("");
+    }
   }
 });
 
@@ -516,7 +525,11 @@ test("the usage page shows tokens: total, trend, where they went and the warning
   await page.goto("/spending");
   await expect(page.getByRole("button", { name: "Tokens" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".headline .big")).toContainText("tokens");
-  await expect(page.getByRole("img", { name: "Tokens over time, coloured by model" })).toBeVisible();
+  await expect(page.getByText("in = what the model read · out = what it wrote")).toBeVisible();
+  const chart = page.getByRole("img", { name: /a spike for each question, as high as its tokens/ });
+  await expect(chart).toBeVisible();
+  await chart.locator(".chart-dot").nth(2).hover({ force: true });
+  await expect(page.locator(".peaks-tip")).toContainText(/Tokens.*in · .*out/);
   for (const tab of ["By model", "By agent", "By tool", "Heaviest questions"]) {
     await page.getByRole("tab", { name: tab }).click();
     await expect(page.locator(".share-row").first()).toBeVisible();
@@ -584,4 +597,30 @@ test("the ? key shows the shortcuts, and numbers do not animate when less motion
   await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toContainText("Usage & cost");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toHaveCount(0);
+});
+
+
+test("a new question appears on every page within seconds, without a reload", async ({ page, request }) => {
+  await page.goto("/spending");
+  const dots = page.locator(".steps-chart .chart-dot");
+  await expect(dots.first()).toBeVisible();
+  const before = await dots.count();
+  // An agent reports a new question (one model call) the way the SDK does: OTLP/JSON to /v1/traces.
+  const now = BigInt(Date.now()) * 1_000_000n;
+  const trace = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const attribute = (key: string, value: string | number) => ({ key, value: typeof value === "number" ? { intValue: String(value) } : { stringValue: value } });
+  const sent = await request.post("/v1/traces", { headers: { "content-type": "application/json" }, data: { resourceSpans: [{
+    resource: { attributes: [attribute("service.name", "bookshop-agent")] },
+    scopeSpans: [{ spans: [{ traceId: trace, spanId: "aaaaaaaaaaaaaaaa", name: "ChatOllama", kind: 1,
+      startTimeUnixNano: String(now - 2_000_000_000n), endTimeUnixNano: String(now),
+      attributes: [attribute("openinference.span.kind", "LLM"), attribute("llm.model_name", "qwen2.5:7b"), attribute("llm.provider", "ollama"),
+        attribute("llm.token_count.prompt", 400), attribute("llm.token_count.completion", 40), attribute("llm.token_count.total", 440),
+        attribute("llm.input_messages.0.message.role", "user"), attribute("llm.input_messages.0.message.content", "A brand new live question?"),
+        attribute("llm.output_messages.0.message.role", "assistant"), attribute("llm.output_messages.0.message.content", "Yes.")] }] }] }] } });
+  expect(sent.ok()).toBeTruthy();
+  const started = Date.now();
+  await expect.poll(() => dots.count(), { timeout: 5000 }).toBeGreaterThan(before); // no reload: the page follows the data
+  expect(Date.now() - started).toBeLessThan(5000);
+  await page.goto("/conversations");
+  await expect(page.locator(".q-card").filter({ hasText: "A brand new live question?" })).toBeVisible();
 });

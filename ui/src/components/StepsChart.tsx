@@ -1,6 +1,6 @@
 // The Overview's line chart: one point per question over time (steps by default; tokens, cost or time on request).
 // Hover shows the question with its steps, tokens and cost; a click (or Enter on the focused point) opens it.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { QueryTimeline } from "../api/types";
 import { formatMoney, formatMs, formatTime, formatTokens } from "../lib/format";
@@ -118,8 +118,14 @@ function tick(ms: number, spanMs: number): string {
     : date.toLocaleDateString([], { day: "numeric", month: "short" });
 }
 
-export function StepsChart({ timeline, hours, onOpen }: { timeline: QueryTimeline; hours: number; onOpen: (row: ChartRow) => void }) {
-  const [measure, setMeasure] = useState<Measure>("steps");
+const ALL_MEASURES: Measure[] = ["steps", "tokens", "cost", "time"];
+
+/** The peak trend chart: the Overview shows it with a Steps | Tokens | Cost | Time switch, the Usage & cost page with one measure. */
+export function StepsChart({ timeline, hours, onOpen, measures = ALL_MEASURES }: {
+  timeline: QueryTimeline; hours: number; onOpen: (row: ChartRow) => void; measures?: Measure[];
+}) {
+  const [chosen, setMeasure] = useState<Measure>(measures[0]);
+  const measure = measures.includes(chosen) ? chosen : measures[0];
   const [focus, setFocus] = useState<number | null>(null);
   const rows = useMemo(() => [...chartRows(timeline, measure)].sort((a, b) => a.startNs - b.startNs), [timeline, measure]);
   // The axis covers only the questions: from a little before the first to a little after the last (the empty time before and after
@@ -135,7 +141,10 @@ export function StepsChart({ timeline, hours, onOpen }: { timeline: QueryTimelin
   const points = useMemo(() => trendPoints(rows, startMs, endMs), [rows, startMs, endMs]);
   const average = rows.length ? rows.reduce((sum, row) => sum + row.value, 0) / rows.length : 0;
   const focusRow = focus !== null ? rows[focus] : null;
-  const animate = !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  // The line draws itself in once when the chart first appears; later updates (new questions) show at once, without animation.
+  const [firstDraw, setFirstDraw] = useState(true);
+  useEffect(() => { const timer = setTimeout(() => setFirstDraw(false), 1600); return () => clearTimeout(timer); }, []);
+  const animate = firstDraw && !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   const onKey = (event: React.KeyboardEvent) => {
     if (!rows.length) return;
     if (event.key === "ArrowRight") { event.preventDefault(); setFocus((i) => Math.min(rows.length - 1, (i ?? -1) + 1)); }
@@ -143,15 +152,20 @@ export function StepsChart({ timeline, hours, onOpen }: { timeline: QueryTimelin
     else if (event.key === "Enter" && focusRow) onOpen(focusRow);
     else if (event.key === "Escape") setFocus(null);
   };
+  // A flat line at zero says nothing: say it in words (e.g. every question ran on a free local model).
+  if (rows.length && rows.every((row) => row.value === 0) && measures.length === 1) {
+    return <p className="flat-note">{measure === "cost" ? "Every question in this period cost $0: the model runs on your own computer, or no price is known."
+      : `Every question in this period has 0 ${measure}.`}</p>;
+  }
   return (
     <div>
-      <div className="row spread" style={{ marginBottom: 6 }}>
+      <div className="row spread chart-head" style={{ marginBottom: 6 }}>
         <span className="muted chart-legend"><i className="dot ok" /> question <i className="dot problem" /> had a problem <i className="avg-swatch" /> average</span>
-        <div className="seg" role="group" aria-label="What the line shows">
-          {(["steps", "tokens", "cost", "time"] as const).map((id) => (
+        {measures.length > 1 && <div className="seg" role="group" aria-label="What the line shows">
+          {measures.map((id) => (
             <button key={id} className={measure === id ? "on" : ""} aria-pressed={measure === id} onClick={() => setMeasure(id)}>{id[0].toUpperCase() + id.slice(1)}</button>
           ))}
-        </div>
+        </div>}
       </div>
       <div className="steps-chart" role="img" tabIndex={0} onKeyDown={onKey} onBlur={() => setFocus(null)}
         aria-label={`Questions over time: a spike for each question, as high as its ${measure}. Use the arrow keys to move between questions and Enter to open one.`}>

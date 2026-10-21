@@ -696,3 +696,13 @@ class SQLiteStorage:
         with self.connect() as db:
             rows = db.execute(f"SELECT * FROM model_info WHERE model IN ({marks})", models).fetchall()
         return [{"provider": r["provider"], "model": r["model"], "info": json.loads(r["info"])} for r in rows]
+
+    # ------------------------------------------------------------- changes
+    def data_version(self) -> str:
+        """A short text that changes whenever something new is stored (spans, tool lists, dismissed findings, prices).
+        The UI asks for it every second and reloads its data only when it changed, so new questions appear at once."""
+        with self.connect() as db:
+            row = db.execute("SELECT (SELECT IFNULL(MAX(rowid), 0) FROM spans), (SELECT COUNT(*) FROM spans), "
+                             "(SELECT IFNULL(MAX(id), 0) FROM tool_snapshots), (SELECT COUNT(*) FROM finding_acks), "
+                             "(SELECT IFNULL(MAX(id), 0) FROM model_prices)").fetchone()
+        return "-".join(str(value) for value in row)

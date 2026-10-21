@@ -46,6 +46,7 @@ async function request<T>(path: string, params?: Params, init?: RequestInit): Pr
 // One function per API route, each with the type of data it returns.
 export const api = {
   health: () => request<{ status: string }>("/health"),
+  version: () => request<{ version: string }>("/api/version"),
   overview: (hours: number) => request<Overview>("/api/stats/overview", { hours }),
   traces: (filters: TraceFilters = {}) => request<TraceSummary[]>("/api/traces", filters as Params),
   trace: (id: string) => request<TraceDetail>(`/api/traces/${id}`),

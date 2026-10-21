@@ -7,7 +7,7 @@ import { FirstRun } from "../components/FirstRun";
 import { FlowGraph, type FlowEdgeInfo, type FlowNodeInfo } from "../components/FlowGraph";
 import { Card, EmptyState, PageHead, QueryState } from "../components/ui";
 import { formatMoney, formatMs, formatTokens, timeAgo } from "../lib/format";
-import { useSettings } from "../lib/state";
+import { useLiveInterval, useSettings } from "../lib/state";
 import { PAGES } from "../lib/words";
 
 const KIND_WORDS: Record<string, string> = { start: "question", end: "answer", step: "step", model: "model", tool: "tool", mcp: "MCP server", gateway: "gateway" };
@@ -66,7 +66,7 @@ function NodePanel({ node, graph, onClose }: { node: GraphNode; graph: AgentGrap
 
 function AgentView({ name }: { name: string }) {
   const [params, setParams] = useSearchParams();
-  const graph = useQuery({ queryKey: ["agent-graph", name], queryFn: () => api.agentGraph(name) });
+  const graph = useQuery({ queryKey: ["agent-graph", name], queryFn: () => api.agentGraph(name), refetchInterval: useLiveInterval() });
   const nodeId = params.get("node");
   const select = (id: string | null) => { const next = new URLSearchParams(params); if (id) next.set("node", id); else next.delete("node"); setParams(next, { replace: true }); };
   return (
@@ -91,7 +91,7 @@ function AgentView({ name }: { name: string }) {
 
 export function Agents() {
   const [params, setParams] = useSearchParams();
-  const agents = useQuery({ queryKey: ["agents"], queryFn: api.agents });
+  const agents = useQuery({ queryKey: ["agents"], queryFn: api.agents, refetchInterval: useLiveInterval() });
   return (
     <>
       <PageHead title={PAGES.agents.title} about={PAGES.agents.about} help={PAGES.agents.help} />

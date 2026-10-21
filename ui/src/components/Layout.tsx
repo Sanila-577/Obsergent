@@ -10,7 +10,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 // The API functions.
 import { api } from "../api/client";
 // Shared settings.
-import { useSettings } from "../lib/state";
+import { useChangeWatcher, useSettings } from "../lib/state";
 // The Ctrl/Cmd+K search box.
 import { CommandPalette } from "./CommandPalette";
 import { Logo } from "./Logo";
@@ -55,6 +55,8 @@ export function Layout() {
   const { live, setLive, hours, setHours, theme, setTheme, detailed, setDetailed } = useSettings();
   // Function that changes the URL.
   const navigate = useNavigate();
+  // New data reloads every page within a second.
+  useChangeWatcher();
   // Is the search box open? The shortcut sheet? The "More" group of the menu?
   const [palette, setPalette] = useState(false);
   const [sheet, setSheet] = useState(false);
@@ -119,12 +121,12 @@ export function Layout() {
       </nav>
       <div className="main">
         <header className="topbar">
-          <button onClick={() => setPalette(true)} aria-label="Open command palette"><Search size={14} /> Search <kbd>⌘K</kbd></button>
+          <button className="topbar-search" onClick={() => setPalette(true)} aria-label="Open command palette"><Search size={14} /><span className="wide-only">Search <kbd>⌘K</kbd></span></button>
           <div className="grow" />
           <Segmented value={detailed ? "detailed" : "simple"} onChange={(mode) => setDetailed(mode === "detailed")}
             options={[{ id: "simple", label: "Simple" }, { id: "detailed", label: "Detailed" }]} />
           <Segmented value={hours} onChange={setHours} options={[{ id: 1, label: "Last hour" }, { id: 24, label: "Today" }, { id: 168, label: "7 days" }]} />
-          <button onClick={() => setLive(!live)} aria-pressed={live} title="Refresh every 2 seconds"><span className={`live-dot${live ? " on" : ""}`} /><Radio size={14} /> Live</button>
+          <button onClick={() => setLive(!live)} aria-pressed={live} aria-label="Live" title="Refresh every 2 seconds"><span className={`live-dot${live ? " on" : ""}`} /><Radio size={14} /><span className="wide-only">Live</span></button>
           <button className="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Switch theme">{theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}</button>
         </header>
         <main className="content"><Outlet /></main>

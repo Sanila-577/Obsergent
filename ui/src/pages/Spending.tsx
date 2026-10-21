@@ -16,11 +16,16 @@ import { useLiveInterval, useSettings } from "../lib/state";
 import { PAGES } from "../lib/words";
 
 // The chart library is large: load it after the first paint.
-const SpendChart = lazy(() => import("../components/SpendChart").then((m) => ({ default: m.SpendChart })));
-const TokensChart = lazy(() => import("../components/TokensChart").then((m) => ({ default: m.TokensChart })));
+const StepsChart = lazy(() => import("../components/StepsChart").then((m) => ({ default: m.StepsChart })));
 
 type Split = "model" | "tool" | "run";
 type TokenSplit = "model" | "agent" | "tool" | "question";
+
+// A peak opens its question; a time slot (many questions) opens the questions of that slot.
+function openRow(navigate: (to: string) => void, row: { count: number; startNs: number; endNs?: number; traceId: string }) {
+  navigate(row.count > 1 ? `/conversations?from=${Math.floor(row.startNs / 1e9)}&to=${Math.ceil((row.endNs ?? row.startNs) / 1e9)}`
+    : `/conversations?q=${row.traceId}`);
+}
 
 // The tokens view: totals, the trend, where the tokens went, and the warnings.
 function TokensView() {
@@ -29,7 +34,7 @@ function TokensView() {
   const refetchInterval = useLiveInterval();
   const [split, setSplit] = useState<TokenSplit>("model");
   const usage = useQuery({ queryKey: ["usage", hours], queryFn: () => api.usage(hours), refetchInterval });
-  const openSlot = (fromNs: number, toNs: number) => navigate(`/conversations?from=${Math.floor(fromNs / 1e9)}&to=${Math.ceil(toNs / 1e9)}`);
+  const timeline = useQuery({ queryKey: ["queries-timeline", hours], queryFn: () => api.queriesTimeline(hours), refetchInterval });
   return (
     <QueryState query={usage} empty={{ when: (u) => u.totals.calls === 0, title: "No tokens used in this period" }}>
       {(u) => {
@@ -47,7 +52,8 @@ function TokensView() {
                 <div className="big"><CountUp value={u.totals.total} format={formatTokens} /> <span className="unit">tokens</span></div>
                 <div className="headline-facts">
                   {u.change !== null && <span className={`trend ${u.change > 0 ? "up" : "down"}`}>{formatChange(u.change)} vs before</span>}
-                  <span><strong>{formatTokens(u.totals.input)}</strong> in · <strong>{formatTokens(u.totals.output)}</strong> out · <strong>{formatTokens(u.totals.cached)}</strong> cached</span>
+                  <span><strong>{formatTokens(u.totals.input)}</strong> in<Help topic="tokensIn" /> · <strong>{formatTokens(u.totals.output)}</strong> out<Help topic="tokensOut" />{u.totals.cached > 0 && <> · <strong>{formatTokens(u.totals.cached)}</strong> cached</>}</span>
+                  <span className="muted">in = what the model read · out = what it wrote</span>
                   <span><strong>{formatTokens(u.totals.avg_per_question)}</strong> per question · <strong>{formatTokens(u.totals.avg_per_call)}</strong> per model call</span>
                 </div>
               </div>
@@ -62,8 +68,10 @@ function TokensView() {
               </div>
             </Card>
 
-            <Card title="Tokens over time">
-              <Suspense fallback={<Skeleton lines={4} />}><TokensChart series={u.series} models={models} hours={hours} onSlot={openSlot} /></Suspense>
+            <Card title={<>Tokens of each question<Help topic="tokensInOut" /></>}>
+              {timeline.data && <Suspense fallback={<Skeleton lines={4} />}>
+                <StepsChart timeline={timeline.data} hours={hours} measures={["tokens"]} onOpen={(row) => openRow(navigate, row)} />
+              </Suspense>}
               <div className="legend" style={{ marginTop: 8 }}>{models.map((model) => <Link key={model} to={`/models?model=${encodeURIComponent(model)}`}><i className="dot" style={{ background: colorFor(models, model) }} /> {model}</Link>)}</div>
             </Card>
 
@@ -130,13 +138,7 @@ function DollarsView() {
   const refetchInterval = useLiveInterval();
   const [split, setSplit] = useState<Split>("model");
   const spending = useQuery({ queryKey: ["spending", hours], queryFn: () => api.spending(hours, hours <= 6 ? 12 : 24), refetchInterval });
-  const windowWords = hours >= 168 ? "the last 7 days" : hours === 1 ? "the last hour" : `the last ${hours} hours`;
-
-  const openSlot = (fromNs: number, toNs: number, model?: string) => {
-    const params = new URLSearchParams({ from: String(Math.floor(fromNs / 1e9)), to: String(Math.ceil(toNs / 1e9)) });
-    if (model) params.set("model", model);
-    navigate(`/runs?${params}`);
-  };
+  const timeline = useQuery({ queryKey: ["queries-timeline", hours], queryFn: () => api.queriesTimeline(hours), refetchInterval });
 
   return (
     <>
@@ -156,19 +158,16 @@ function DollarsView() {
             <div className="col" style={{ gap: 16 }}>
               <Card>
                 <div className="headline">
-                  <div className="big">{formatMoney(s.totals.usd)}</div>
-                  <div>
-                    You spent <strong>{moneyInWords(s.totals.usd)}</strong> in {windowWords}, across {s.totals.calls} model call{s.totals.calls === 1 ? "" : "s"}.
-                    {s.totals.local > 0 && <> {s.totals.local} ran on your own computer and cost nothing.</>}
-                    {s.totals.priced > 0 && <> That is about {moneyInWords(perCall)} per call.</>}
+                  <div className="big"><CountUp value={s.totals.usd} format={formatMoney} /></div>
+                  <div className="headline-facts">
+                    <span>You spent <strong>{moneyInWords(s.totals.usd)}</strong> on <strong>{s.totals.calls}</strong> model call{s.totals.calls === 1 ? "" : "s"}</span>
+                    {s.totals.priced > 0 && <span>about <strong>{moneyInWords(perCall)}</strong> per call</span>}
+                    {s.totals.local > 0 && <span className="ok-text">{s.totals.local} free calls on your own computer</span>}
+                    {(s.totals.exact_usd ?? 0) > 0 && s.totals.usd > 0 && (
+                      <span><strong>{Math.round(((s.totals.exact_usd ?? 0) / s.totals.usd) * 100)}%</strong> of this amount was reported by the provider itself (exact)</span>
+                    )}
                   </div>
                 </div>
-                {(s.totals.exact_usd ?? 0) > 0 && s.totals.usd > 0 && (
-                  <p className="muted" style={{ margin: "10px 0 0" }}>
-                    <strong>{Math.round(((s.totals.exact_usd ?? 0) / s.totals.usd) * 100)}%</strong> of this amount was reported by the
-                    provider itself (exact); the rest is estimated from the tokens used and the model's price.
-                  </p>
-                )}
                 {unpricedModels.length > 0 && (
                   <div className="notice" role="note">
                     <strong>{s.totals.unpriced} call(s) are not counted</strong> because no price is known for {unpricedModels.map((m) => m.model).join(", ")}.
@@ -177,9 +176,10 @@ function DollarsView() {
                 )}
               </Card>
 
-              <Card title="Spending over time">
-                <p className="muted" style={{ marginTop: -6 }}>Each bar is a time slot, split by model. <strong>Click a bar</strong> to see those conversations.</p>
-                <Suspense fallback={<Skeleton lines={4} />}><SpendChart series={s.series} models={models} hours={hours} onSlot={openSlot} /></Suspense>
+              <Card title="Cost of each question">
+                {timeline.data && <Suspense fallback={<Skeleton lines={4} />}>
+                  <StepsChart timeline={timeline.data} hours={hours} measures={["cost"]} onOpen={(row) => openRow(navigate, row)} />
+                </Suspense>}
                 <div className="legend" style={{ marginTop: 8 }}>
                   {models.map((model) => (
                     <button key={model} className="small ghost" onClick={() => navigate(`/runs?model=${encodeURIComponent(model)}`)} title="Show conversations that used this model">
@@ -190,7 +190,7 @@ function DollarsView() {
 
               <Card title="Where did the money go?" flush>
                 <div style={{ padding: "0 16px" }}>
-                  <Tabs<Split> value={split} onChange={setSplit} tabs={[{ id: "model", label: "By model" }, { id: "tool", label: "By action" }, { id: "run", label: "Most expensive conversations" }]} />
+                  <Tabs<Split> value={split} onChange={setSplit} tabs={[{ id: "model", label: "By model" }, { id: "tool", label: "By tool" }, { id: "run", label: "Most expensive" }]} />
                 </div>
                 {rows.length === 0 ? <EmptyState title="Nothing to show yet" /> : (
                   <ul className="share-list">

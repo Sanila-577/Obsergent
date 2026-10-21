@@ -1,7 +1,9 @@
 // App-wide settings kept in React context: live tail, the time window of the dashboards, light/dark theme.
 // Each one is remembered in localStorage (wrapped in try/catch: storage can be blocked).
 // React building blocks: context (shared values), state, effects, memoisation.
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { api } from "../api/client";
 
 // A hook like useState that also saves the value in localStorage (the browser's small key-value store).
 function useRemembered<T>(key: string, fallback: T): [T, (value: T) => void] {
@@ -74,8 +76,23 @@ export function useSettings(): Settings {
   return settings;
 }
 
-/** `refetchInterval` for react-query: poll every 2 s while "live" is on, otherwise never. */
-// How often to refetch: every 2s in live mode, otherwise never.
-export function useLiveInterval(): number | false {
-  return useSettings().live ? 2000 : false;
+/** `refetchInterval` for react-query: a safety net only. New data reaches the pages through `useChangeWatcher` (within a
+ * second); this regular reload (every 2 s with "Live" on, else every 15 s) also keeps relative times such as "3 min ago" fresh. */
+export function useLiveInterval(): number {
+  return useSettings().live ? 2000 : 15_000;
+}
+
+/** Ask the server every second whether anything new was stored; when the answer changes, reload every page's data at once. */
+export function useChangeWatcher(): void {
+  const client = useQueryClient();
+  const version = useQuery({ queryKey: ["version"], queryFn: api.version, refetchInterval: 1000, refetchIntervalInBackground: false, retry: false });
+  const last = useRef<string | null>(null);
+  useEffect(() => {
+    const now = version.data?.version;
+    if (!now) return;
+    if (last.current !== null && last.current !== now) {
+      client.invalidateQueries({ predicate: (query) => !["version", "health"].includes(String(query.queryKey[0])) });
+    }
+    last.current = now;
+  }, [version.data, client]);
 }

@@ -49,10 +49,14 @@ class Session:
         return attrs
 
 
+# How often recorded spans are sent to the server (milliseconds): short, so the UI is close to real time.
+EXPORT_EVERY_MS = 1000
+
 def make_provider(session: Session) -> TracerProvider:
     """A tracer provider that tags every span with the session and sends them to the server in batches."""
     # The provider stamps every span with the session's resource attributes.
     provider = TracerProvider(resource=Resource.create(session.resource_attributes()))
-    # Batches of finished spans are POSTed to <server>/v1/traces in the background.
-    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=f"{config.endpoint()}/v1/traces")))
+    # Batches of finished spans are POSTed to <server>/v1/traces in the background, every second (the default is 5 s).
+    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=f"{config.endpoint()}/v1/traces"),
+                                                   schedule_delay_millis=EXPORT_EVERY_MS))
     return provider

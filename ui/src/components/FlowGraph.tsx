@@ -6,7 +6,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Maximize2 } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { findBackEdges, layoutGraph, pathAround } from "../lib/layout";
 
 export interface FlowNodeInfo {
@@ -34,17 +34,20 @@ interface NodeData extends Record<string, unknown> {
   kindLabel: string;
   dimmed: boolean;
   selected: boolean;
+  /** Phones: the flow runs top to bottom instead of left to right. */
+  vertical: boolean;
 }
 
-// One box. The handles on the sides carry the normal flow; the ones at the bottom carry loops (agent -> tools -> agent).
+// One box. Two handles carry the normal flow (left/right, or top/bottom on phones); the other two carry loops
+// (agent -> tools -> agent), drawn below the boxes (or to their right on phones).
 function FlowNode({ data }: NodeProps<Node<NodeData>>) {
-  const { info, kindLabel, dimmed, selected } = data;
+  const { info, kindLabel, dimmed, selected, vertical } = data;
   return (
     <div className={`flow-node ${info.kind}${selected ? " selected" : ""}${dimmed ? " dimmed" : ""}${info.tone ? ` ${info.tone}` : ""}`}>
-      <Handle type="target" position={Position.Left} />
-      <Handle type="source" position={Position.Right} />
-      <Handle id="bi" type="target" position={Position.Bottom} />
-      <Handle id="bo" type="source" position={Position.Bottom} />
+      <Handle type="target" position={vertical ? Position.Top : Position.Left} />
+      <Handle type="source" position={vertical ? Position.Bottom : Position.Right} />
+      <Handle id="bi" type="target" position={vertical ? Position.Right : Position.Bottom} />
+      <Handle id="bo" type="source" position={vertical ? Position.Right : Position.Bottom} />
       <small>{kindLabel}</small>
       <strong>{info.label}</strong>
       {info.badge && <span className="badge gateway">{info.badge}</span>}
@@ -73,16 +76,33 @@ interface Props {
   legend?: ReactNode;
 }
 
+// True while the screen is narrower than `width` pixels (follows rotation and resizing).
+function useNarrow(width = 700): boolean {
+  const query = `(max-width: ${width}px)`;
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.(query).matches);
+  useEffect(() => {
+    const list = window.matchMedia?.(query);
+    if (!list) return;
+    const onChange = () => setNarrow(list.matches);
+    list.addEventListener("change", onChange);
+    return () => list.removeEventListener("change", onChange);
+  }, [query]);
+  return narrow;
+}
+
 function Canvas({ nodes, edges, kindLabels, roots = [], last = ["end"], selectedId, onSelect, ariaLabel, height = 520, columnGap = 250, legend }: Props) {
+  const vertical = useNarrow();
   const [hover, setHover] = useState<string | null>(null);
   const flow = useReactFlow();
 
   // The layout depends only on the shape of the graph, not on hover or selection.
   const layout = useMemo(() => {
     const back = findBackEdges(nodes, edges, roots);
-    const placed = new Map(layoutGraph(nodes, edges, { roots, last, columnGap }).map((p) => [p.id, p]));
+    // On phones the columns become rows: the same layout with x and y swapped (and gaps that suit a tall, narrow screen).
+    const laid = layoutGraph(nodes, edges, vertical ? { roots, last, columnGap: 110, rowGap: 180 } : { roots, last, columnGap });
+    const placed = new Map(laid.map((p) => [p.id, vertical ? { ...p, x: p.y, y: p.x } : p]));
     return { back, placed };
-  }, [nodes, edges, roots, last, columnGap]);
+  }, [nodes, edges, roots, last, columnGap, vertical]);
 
   // While a box is hovered (or selected) everything not on a path through it is dimmed.
   const focus = hover ?? selectedId;
@@ -91,7 +111,7 @@ function Canvas({ nodes, edges, kindLabels, roots = [], last = ["end"], selected
   const flowNodes = nodes.map<Node<NodeData>>((info) => ({
     id: info.id, type: "flow", draggable: true,
     position: { x: layout.placed.get(info.id)?.x ?? 0, y: layout.placed.get(info.id)?.y ?? 0 },
-    data: { info, kindLabel: kindLabels[info.kind] ?? info.kind, dimmed: around ? !around.has(info.id) : false, selected: info.id === selectedId },
+    data: { info, kindLabel: kindLabels[info.kind] ?? info.kind, dimmed: around ? !around.has(info.id) : false, selected: info.id === selectedId, vertical },
   }));
   const flowEdges = edges.map<Edge>((edge) => {
     const key = `${edge.source}->${edge.target}`;
@@ -110,8 +130,9 @@ function Canvas({ nodes, edges, kindLabels, roots = [], last = ["end"], selected
   });
 
   return (
-    <div className="flow" style={{ height }} role="group" aria-label={ariaLabel}>
-      <ReactFlow nodes={flowNodes} edges={flowEdges} nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.18 }} minZoom={0.25}
+    <>
+    <div className="flow" style={{ height: vertical ? Math.max(height, 560) : height }} role="group" aria-label={ariaLabel}>
+      <ReactFlow nodes={flowNodes} edges={flowEdges} nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.18, minZoom: vertical ? 0.55 : 0.25 }} minZoom={0.25}
         nodesConnectable={false} elementsSelectable proOptions={{ hideAttribution: true }}
         onNodeMouseEnter={(_, node) => setHover(node.id)} onNodeMouseLeave={() => setHover(null)}
         onNodeClick={(_, node) => onSelect(node.id === selectedId ? null : node.id)} onPaneClick={() => onSelect(null)}>
@@ -121,9 +142,10 @@ function Canvas({ nodes, edges, kindLabels, roots = [], last = ["end"], selected
         <Panel position="top-right">
           <button className="small" onClick={() => { onSelect(null); flow.fitView({ padding: 0.18, duration: 300 }); }}><Maximize2 size={13} /> Reset view</button>
         </Panel>
-        {legend && <Panel position="top-left"><div className="legend flow-legend">{legend}</div></Panel>}
       </ReactFlow>
     </div>
+    {legend && <div className="legend flow-legend">{legend}</div>}
+    </>
   );
 }
 

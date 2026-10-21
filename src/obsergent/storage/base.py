@@ -136,3 +136,6 @@ class Backend(Storage, MetaStore, Protocol):
 
     def model_info(self, models: list[str]) -> list[dict]:
         """The stored facts for these model names."""
+
+    def data_version(self) -> str:
+        """A text that changes whenever something new is stored (the UI reloads when it changes)."""

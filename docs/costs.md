@@ -117,10 +117,108 @@ A call older than the first price Obsergent saw for that model uses the oldest k
 * `pricing.exact_from_provider: false`: always show estimates.
 * `pricing.enabled: false`: no costs at all.
 
-## Tokens
+## Tokens: what they are and how Obsergent collects them
 
-The cost is built from tokens, and the tokens are worth watching on their own (they show how much an agent reads and writes even
-when the model is free). The Usage & cost page has a **Tokens** view, the Overview a Tokens tile, and `make usage` prints the same
-numbers. Totals are input + output; cached tokens are part of the input, reasoning tokens part of the output. A daily budget can be
-set with `usage.daily_token_budget` in `config.yaml`; questions far above the usual are flagged in Things to check. See the
-README section "Monitoring tokens".
+### What a token is
+
+A model does not read words or letters: it reads **tokens**, small pieces of text from its own vocabulary (a short word, part of a
+longer word, a space, a punctuation mark). In English one token is about ¾ of a word, or about 4 characters. Every provider bills
+by tokens, and every model has a limit on how many it can read at once (its "context window").
+
+### Tokens in and tokens out
+
+| | **Tokens in** (input, "prompt") | **Tokens out** (output, "completion") |
+|---|---|---|
+| What it is | everything the model **reads** for one call | everything the model **writes** in that call |
+| What is in it | the instructions (system prompt), your question, the conversation so far, the results of the tools it used, and the descriptions of the tools it may use | its answer, and its requests to use a tool ("call search_books with query=Python") |
+| How big | usually most of the tokens, and it **grows with every step**: each model call re-reads the whole conversation | usually small |
+| Price | the cheaper kind (e.g. gpt-4o-mini: $0.15 per million) | 3–5 times dearer per token (gpt-4o-mini: $0.60 per million) |
+| Time | read quickly | written one token at a time, so it decides how long you wait |
+| Cached | part of the input can come from the provider's cache (repeated beginning of a prompt), billed much cheaper | - |
+| Reasoning | - | "thinking" models write hidden reasoning tokens; they are part of the output and billed as output |
+
+**Which one matters most to you?**
+* **Total tokens per question** (in + out) is the headline: how much work one question costs. It is the height of the peaks on the
+  Overview and on Usage & cost, and the number on every question card.
+* **Tokens in** is where tokens can usually be saved: long instructions, long tool results and many tool descriptions are re-read on
+  every step (the Usage page shows the "hidden overhead" of the tool descriptions). It is also what hits the model's context limit
+  (Usage & cost warns at 80 %).
+* **Tokens out** matters for the bill (dearer per token) and for speed (written one by one); watch it when answers are long.
+
+### How the number of tokens is calculated
+
+**Obsergent does not count tokens itself.** The model provider counts them with the model's own tokenizer while it answers, and
+sends the counts back with every response. Obsergent records exactly those numbers, so they match the provider's bill. The names
+differ per provider; LangChain turns them all into one shape (`usage_metadata`):
+
+| Provider | What its response contains | Becomes (LangChain `usage_metadata`) |
+|---|---|---|
+| Ollama (your setup) | `prompt_eval_count`, `eval_count` | `input_tokens`, `output_tokens` |
+| OpenAI, OpenRouter, Groq, Together... | `usage.prompt_tokens`, `usage.completion_tokens` (+ `prompt_tokens_details.cached_tokens`, `completion_tokens_details.reasoning_tokens`) | the same |
+| Anthropic | `usage.input_tokens`, `usage.output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens` | the same |
+| Google Gemini | `usage_metadata.prompt_token_count`, `candidates_token_count`, `thoughts_token_count` | the same |
+
+The **only estimates** are marked "≈" in the UI: in a question's thread, your own message and each tool result have no count of
+their own (they are part of the *next* model call's input), so their size is estimated as characters ÷ 4. The same rule estimates
+the "hidden overhead" of the tool descriptions. Totals never use estimates: they add up the provider's numbers only.
+
+### Where the tokens come from: the procedure, step by step
+
+```
+your agent ──(1) asks the model──► model provider (Ollama) ──(2) answer + token counts──► LangChain (usage_metadata)
+     │                                                                                          │
+     └── obsergent.sdk.init() ◄──(3) the recorder reads the counts and writes them on a span ◄──┘
+              │
+              └──(4) OTLP/HTTP, every second──► Obsergent server :7318/v1/traces ──(5)──► SQLite (spans table)
+                                                                                     │
+                       web UI · `make usage` · REST API ◄──(6) added up when shown ◄──┘
+```
+
+1. **Your agent asks the model.** The example agent (`examples/bookshop/agent.py`) uses LangChain's `ChatOllama`; any LangChain
+   chat model works, and `obsergent.sdk.init(instrument=["openai"])` / `["anthropic"]` covers code that calls those SDKs directly.
+2. **The provider answers with the counts.** A real answer from your Ollama `qwen2.5:7b`:
+   `prompt_eval_count: 332, eval_count: 27`. LangChain stores them as
+   `usage_metadata: {input_tokens: 332, output_tokens: 27, total_tokens: 359}`.
+3. **The recorder writes them on the model call's span.** `obsergent.sdk.init()` turns on the OpenInference LangChain
+   instrumentor, which records every model call as a span with
+   `llm.token_count.prompt = 332`, `llm.token_count.completion = 27`, `llm.token_count.total = 359`
+   (plus `llm.token_count.prompt_details.cache_read` and `llm.token_count.completion_details.reasoning` when the provider reports
+   them). On arrival, `ingest/billed.py` adds the facts some providers report in their own words (DeepSeek cache hits,
+   Anthropic one-hour cache writes, Cohere billed units).
+4. **The span is sent to Obsergent** over OpenTelemetry (OTLP/HTTP, `POST :7318/v1/traces`), in batches **every second**, so a
+   question shows up in the UI while the agent is still running.
+5. **The server stores it** in SQLite (`~/.obsergent/obsergent.db`, table `spans`, column `attributes`). Nothing is summed when
+   it is stored.
+6. **Totals are calculated when they are shown**, from the stored spans: per question (`analysis/queries.py: token_sums`), per
+   period, model, agent and tool (`analysis/usage.py`), per model (`server/catalog.py`). The cost is `tokens × price` (see
+   "The formula" above). The UI asks the server every second whether anything new arrived and reloads at once when it did.
+
+**What is needed:** the agent must call `obsergent.sdk.init()` (section 2 of the README). The recording **proxy alone** sees only
+the MCP tool traffic, not the model calls, so it records no tokens; apps you cannot change (Claude Desktop, Cursor) never send
+their model's token counts anywhere, so their tokens cannot be shown.
+
+### A real example (your Ollama, `qwen2.5:7b`)
+
+"What is the cheapest book you have?" took 5 steps and **640 tokens** (568 in + 72 out):
+
+| Step | Side | Tokens | Why |
+|---|---|---|---|
+| your question | 🧑 | ≈ 9 | estimated from its length; it is part of the next call's input |
+| model call 1 | 🤖 | 236 in · 45 out | read the instructions, the tool descriptions and the question; wrote a request to use `search_books` |
+| tool `search_books` | 🔧 | ≈ 1 | its (empty) result is added to the next call's input |
+| tool `get_price_and_stock` | 🔧 | ≈ 12 | its result is added to the next call's input |
+| model call 2 (answer) | 🤖 | 332 in · 27 out | re-read **everything** above (that is why the input grew from 236 to 332) and wrote the answer |
+
+The total is the sum of the model calls only: (236 + 332) in + (45 + 27) out = 640. On Ollama this costs $0 (it runs on your
+computer); the same tokens on gpt-4o-mini would cost 568 × $0.15/1M + 72 × $0.60/1M ≈ $0.00013.
+
+### Where to watch them
+
+* **Overview:** the Tokens tile (and the change from the period before); the peaks chart switched to Tokens.
+* **Usage & cost → Tokens:** a peak per question as high as its tokens, where the tokens went (model, agent, tool, heaviest
+  questions), the hidden overhead, prompts near the model's limit, heavy questions, the daily budget.
+* **Conversations:** the tokens of each step.
+* **Models:** the tokens of each model and their trend.
+* **Terminal:** `make usage` (`HOURS=168 make usage` for a week).
+* **Budget:** `usage.daily_token_budget` in `config.yaml` (or `OBSERGENT_TOKEN_BUDGET`) warns from `usage.warn_at_percent`
+  (80 %); questions far above your usual are flagged in Things to check.

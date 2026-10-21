@@ -19,7 +19,7 @@ import "./styles/glass.css";
 
 // Data is cheap to refetch from a local server: keep it fresh, but don't retry failed calls for long.
 // The shared data cache.
-const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 5_000, retry: 1, refetchOnWindowFocus: false } } });
+const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 5_000, retry: 1, refetchOnWindowFocus: true } } });
 
 // Find <div id="root"> in index.html and draw the app inside it.
 createRoot(document.getElementById("root")!).render(

@@ -71,6 +71,9 @@ INSTRUMENTORS = {
 
 
 # Switch on tracing for one framework.
+# How often recorded spans are sent to the server (milliseconds): short, so the UI is close to real time.
+EXPORT_EVERY_MS = 1000
+
 def instrument_framework(name: str, provider: TracerProvider, required: bool) -> bool:
     """Hook one framework into the provider. A missing optional package is an error only if it was requested."""
     # Unknown name typed by the user.
@@ -105,8 +108,10 @@ def init(service_name: str, instrument_langchain: bool = True, instrument: list[
     """
     # Create a provider that labels spans with this program's name.
     provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
-    # Batch = collect spans and send them together every few seconds (fast), to /v1/traces.
-    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=f"{config.endpoint()}/v1/traces")))
+    # Batch = collect spans and send them together, to /v1/traces. Every second (the library's default is 5 s), so a question
+    # shows up in the UI about a second after it ends.
+    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=f"{config.endpoint()}/v1/traces"),
+                                                   schedule_delay_millis=EXPORT_EVERY_MS))
     # Make it the global one so any code can find it.
     trace.set_tracer_provider(provider)  # make it the global provider
     # Frameworks the caller asked for.
