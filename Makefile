@@ -7,11 +7,13 @@
 # Settings (ports, database file, gateway addresses) are in config.yaml.
 #
 # Python: uses the virtual environment that is already active; if none is, it uses ./.venv (create it with `make install`,
-# which runs `uv venv` and `uv pip install -r requirements.txt`). No need to activate again.
+# which runs `uv venv` and `uv pip install -r requirements.txt`). No need to activate again. An active environment that no
+# longer exists (e.g. activated before the folder was renamed) is ignored.
 SHELL := /bin/bash
 
 # ----------------------------------------------------------------------------------------------------------- settings
-VENV_BIN          := $(if $(VIRTUAL_ENV),$(VIRTUAL_ENV)/bin,.venv/bin)
+VENV_ACTIVE       := $(if $(VIRTUAL_ENV),$(wildcard $(VIRTUAL_ENV)/bin/python))
+VENV_BIN          := $(if $(VENV_ACTIVE),$(VIRTUAL_ENV)/bin,.venv/bin)
 # For `make proxy` / `make proxy-bg`: record any remote MCP server (default: the WSO2 gateway of config.yaml).
 NAME              ?=
 URL               ?=
@@ -29,9 +31,16 @@ help:  ## show this list
 
 ##@ Install and build (once)
 .PHONY: install ui-install ui-build env setup diagrams
-install:  ## uv venv (if no environment is active or present) + uv pip install -r requirements.txt
-	@if [ -z "$$VIRTUAL_ENV" ] && [ ! -d .venv ]; then uv venv; fi
-	uv pip install -r requirements.txt
+# A virtual environment stores its absolute path (in bin/activate and every script's #! line), so after the folder is renamed
+# or moved, .venv still exists but activating it points at the old folder: it is recreated. VS Code does not notice a
+# recreated .venv by itself (new terminals stop activating it until its Python environments are refreshed), hence the hint.
+install:  ## uv venv (if no environment is active or present; recreated if the folder was renamed) + uv pip install -r requirements.txt
+	@if [ -d .venv ] && ! grep -qF "$(CURDIR)/.venv" .venv/bin/activate 2>/dev/null; then \
+		echo ".venv was created in another folder (renamed or moved): recreating it"; rm -rf .venv; uv venv; \
+		echo "VS Code: run 'Python Environments: Refresh All Environment Managers' (or 'Developer: Reload Window') so new terminals activate it"; \
+	fi
+	@if [ -z "$(VENV_ACTIVE)" ] && [ ! -d .venv ]; then uv venv; fi
+	$(if $(VENV_ACTIVE),,VIRTUAL_ENV="$(CURDIR)/.venv") uv pip install -r requirements.txt
 ui-install:  ## UI dependencies (needs Node.js 20+)
 	cd ui && npm install
 ui-build:  ## build the web UI into src/obsergent/server/static/

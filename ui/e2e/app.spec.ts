@@ -463,22 +463,37 @@ test("less motion switches the animated arrows off", async ({ page }) => {
   if (await edge.count()) expect(await edge.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
 });
 
-test("every page fits any phone: no sideways scrolling, nothing sticking out", async ({ page }) => {
+// The page's data has arrived: none of its API calls is still running, and none started for 300 ms (the once-a-second
+// /api/version poll does not count). Checking the layout earlier would check an empty page, and leaving earlier would
+// pile the unfinished calls up on the server, slowing every page after it (that made this test time out on CI).
+async function dataLoaded(page: Page) {
+  const running = new Set<object>();
+  let last = Date.now();
+  const counts = (url: string) => new URL(url).pathname.startsWith("/api/") && !url.includes("/api/version");
+  page.on("request", (r) => { if (counts(r.url())) { running.add(r); last = Date.now(); } });
+  const done = (r: object) => { if (running.delete(r)) last = Date.now(); };
+  page.on("requestfinished", done);
+  page.on("requestfailed", done);
+  return () => expect.poll(() => running.size === 0 && Date.now() - last >= 300, { intervals: [100] }).toBe(true);
+}
+
+// One test per width: each one loads every page with its data, which takes a few seconds on a CI machine.
+for (const width of [320, 360, 390, 414]) test(`every page fits a ${width}px phone: no sideways scrolling, nothing sticking out`, async ({ page }) => {
   const pages = ["/", "/conversations", "/agents", "/mcps", "/models", "/spending", "/spending?view=dollars", "/findings", "/gateway", "/map", "/sessions", "/compare", "/about"];
-  for (const width of [320, 360, 390, 414]) {
-    await page.setViewportSize({ width, height: 800 });
-    for (const path of pages) {
-      await page.goto(path);
-      await expect(page.locator(".page-head h1")).toBeVisible();
-      const problem = await page.evaluate(() => {
-        if (document.documentElement.scrollWidth > document.documentElement.clientWidth + 1) return "the page scrolls sideways";
-        // Something wider than the screen that is not inside a box made to scroll sideways (strips, tables, charts).
-        const scrolls = (el: Element) => { for (let p = el.parentElement; p; p = p.parentElement) { const s = getComputedStyle(p); if (["auto", "scroll", "hidden"].includes(s.overflowX) && p.scrollWidth > p.clientWidth + 1) return true; } return false; };
-        const out = [...document.querySelectorAll("body *")].find((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.right > window.innerWidth + 2 && !scrolls(el); });
-        return out ? `${out.tagName.toLowerCase()}.${[...out.classList].join(".")} sticks out` : "";
-      });
-      expect(problem, `${path} at ${width}px`).toBe("");
-    }
+  const settled = await dataLoaded(page);
+  await page.setViewportSize({ width, height: 800 });
+  for (const path of pages) {
+    await page.goto(path);
+    await expect(page.locator(".page-head h1")).toBeVisible();
+    await settled();
+    const problem = await page.evaluate(() => {
+      if (document.documentElement.scrollWidth > document.documentElement.clientWidth + 1) return "the page scrolls sideways";
+      // Something wider than the screen that is not inside a box made to scroll sideways (strips, tables, charts).
+      const scrolls = (el: Element) => { for (let p = el.parentElement; p; p = p.parentElement) { const s = getComputedStyle(p); if (["auto", "scroll", "hidden"].includes(s.overflowX) && p.scrollWidth > p.clientWidth + 1) return true; } return false; };
+      const out = [...document.querySelectorAll("body *")].find((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.right > window.innerWidth + 2 && !scrolls(el); });
+      return out ? `${out.tagName.toLowerCase()}.${[...out.classList].join(".")} sticks out` : "";
+    });
+    expect(problem, `${path} at ${width}px`).toBe("");
   }
 });
 
