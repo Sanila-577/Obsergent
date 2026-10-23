@@ -13,3 +13,4 @@ uv.lock
 ui/node_modules/
 src/obsergent/server/static/*
 .run/
+.DS_Store
