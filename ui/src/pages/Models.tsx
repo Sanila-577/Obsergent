@@ -118,7 +118,7 @@ function Detail({ model }: { model: ModelEntry }) {
             <Fact label="Knows events until" value={info.knowledge ?? "-"} />
             <Fact label="Family" value={info.family ?? "-"} />
           </dl>
-          {!Object.keys(info).length && <p className="muted">The price lists know nothing more about this model. They are checked automatically (see Spending).</p>}
+          {!Object.keys(info).length && <p className="muted">The price lists know nothing more about this model. They are checked automatically (see Usage &amp; cost).</p>}
         </div>
       </div>
       {model.series && <><h3 style={{ marginTop: 16 }}>Tokens over time</h3><Suspense fallback={<Skeleton lines={3} />}><ModelTokensChart series={model.series} hours={hours} /></Suspense></>}

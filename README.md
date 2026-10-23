@@ -83,7 +83,7 @@ commands are typed inside that repository ([WSO2 section](#6-use-it-with-the-wso
 After the [Prerequisites](#1-prerequisites) install:
 
 ```bash
-make setup  
+make setup
 ```
 
 `requirements.txt` installs this folder in editable mode (`-e`), so edits take effect at once. Everything in one command,
